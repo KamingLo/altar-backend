@@ -1,0 +1,28 @@
+package models
+
+import (
+	"altar/utils"
+	"time"
+
+	"gorm.io/gorm"
+)
+
+type Book struct {
+	ID        string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+
+	Title       string `json:"title" binding:"required"`
+	Author      string `json:"author" binding:"required"`
+	Description string `json:"description" binding:"required"`
+}
+
+func init() {
+	RegisterModel(&Book{})
+}
+
+func (b *Book) BeforeCreate(tx *gorm.DB) (err error) {
+	b.ID = utils.GenerateCustomID("bk", 6)
+	return nil
+}
