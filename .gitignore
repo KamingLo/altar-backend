@@ -4,3 +4,5 @@
 main
 tmp
 !.env.example
+altar-api
+*.sh

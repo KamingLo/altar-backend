@@ -25,10 +25,10 @@ func ConnectDatabase() {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		host, user, password, dbName, port, sslMode)
 
-	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		fmt.Println("Failed to connect to database: " + err.Error())
-	}
+	database, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true, // This disables prepared statement caching
+	}), &gorm.Config{})
 
 	err = database.AutoMigrate(models.ModelsRegistry...)
 	fmt.Println(models.ModelsRegistry...)
