@@ -9,16 +9,18 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func GenerateToken(userID string, email string) (string, error) {
+func GenerateToken(userID string, email string, idAsisten, idKoordinator *string) (string, error) {
 	secretKey := []byte(os.Getenv("JWT_SECRET"))
 
 	isExpires := os.Getenv("JWT_EXPIRES")
 	expiresInStr := os.Getenv("JWT_EXPIRES_IN")
 
 	claims := jwt.MapClaims{
-		"user_id": userID,
-		"email":   email,
-		"iat":     time.Now().Unix(),
+		"user_id":       userID,
+		"email":         email,
+		"id_asisten":    idAsisten,
+		"id_koordinator": idKoordinator,
+		"iat":           time.Now().Unix(),
 	}
 
 	if isExpires == "enable" {

@@ -13,10 +13,22 @@ func AuthRoutes(r *gin.Engine) {
 		auth.GET("/google", controllers.GoogleLogin)
 		auth.GET("/google/callback", controllers.GoogleCallback)
 		auth.POST("/login", controllers.Login)
-		auth.POST("/otp", controllers.RequestOTP)
-		auth.POST("/register", controllers.Register)
 		auth.POST("/forgot-password", controllers.ForgotPassword)
 		auth.POST("/reset-password", controllers.ResetPassword)
+
+		// Koordinator Protected Routes
+		koor := auth.Group("/")
+		koor.Use(AuthMiddleware(), IsKoordinatorMiddleware())
+		{
+			koor.GET("/is-koor", controllers.CheckKoor)
+		}
+
+		// Asisten Dosen Protected Routes
+		asdos := auth.Group("/")
+		asdos.Use(AuthMiddleware(), IsAsdosMiddleware())
+		{
+			asdos.GET("/is-asdos", controllers.CheckAsdos)
+		}
 
 		// Private Routes (login needed)
 		private := auth.Group("/")

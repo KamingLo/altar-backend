@@ -6,104 +6,75 @@ import (
 	"altar/utils"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-func RequestOTP(email string) error {
-	var existingUser models.User
-	err := config.DB.Where("email = ?", email).First(&existingUser).Error
-	if err == nil {
-		return errors.New("email is already registered, please log in")
-	}
-
-	var existingOTP models.OTP
-	errOTP := config.DB.Where("email = ?", email).First(&existingOTP).Error
-
-	code := fmt.Sprintf("%06d", rand.IntN(900000)+100000)
-	now := time.Now()
-
-	if errOTP == nil {
-		var cooldown time.Duration
-
-		switch existingOTP.RequestCount {
-		case 1:
-			cooldown = 30 * time.Second
-		case 2:
-			cooldown = 60 * time.Second
-		case 3:
-			cooldown = 5 * time.Minute
-		default:
-			cooldown = 1 * time.Hour
-		}
-
-		timeSinceLast := time.Since(existingOTP.UpdatedAt)
-
-		if timeSinceLast > 24*time.Hour {
-			existingOTP.RequestCount = 0
-		} else if timeSinceLast < cooldown {
-			timeLeft := int(cooldown.Seconds() - timeSinceLast.Seconds())
-
-			var timeMsg string
-			if timeLeft < 60 {
-				timeMsg = fmt.Sprintf("%d seconds", timeLeft)
-			} else if timeLeft < 3600 {
-				timeMsg = fmt.Sprintf("%d minutes %d seconds", timeLeft/60, timeLeft%60)
-			} else {
-				timeMsg = fmt.Sprintf("%d hours %d minutes", timeLeft/3600, (timeLeft%3600)/60)
-			}
-
-			return fmt.Errorf("too many requests; try again in %s", timeMsg)
-		}
-
-		existingOTP.Code = code
-		existingOTP.ExpiredAt = now.Add(5 * time.Minute)
-		existingOTP.RequestCount += 1
-
-		if err := config.DB.Save(&existingOTP).Error; err != nil {
-			return errors.New("failed to update verification session")
-		}
-
-	} else {
-		newOTP := models.OTP{
-			Email:        email,
-			Code:         code,
-			ExpiredAt:    now.Add(5 * time.Minute),
-			RequestCount: 1,
-		}
-
-		if err := config.DB.Create(&newOTP).Error; err != nil {
-			return errors.New("failed to create verification session")
-		}
-	}
-
-	// Assuming SendRegistrationOTP is defined in your utils or internal helper
-	if err := SendRegistrationOTP(email, code); err != nil {
-		return errors.New("failed to send email; ensure the address is correct")
-	}
-
-	return nil
-}
-
-func RegisterWithOTP(input *models.User, otpCode string) error {
-	var otp models.OTP
-	err := config.DB.Where("email = ? AND code = ?", input.Email, otpCode).First(&otp).Error
-	if err != nil || time.Now().After(otp.ExpiredAt) {
-		return errors.New("invalid or expired OTP code")
-	}
+func RegisterAsdos(input *models.User, nim, phone string) error {
+	tx := config.DB.Begin()
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	input.Password = string(hashedPassword)
 
-	if err := config.DB.Create(input).Error; err != nil {
-		return errors.New("failed to save user account")
+	if err := tx.Create(input).Error; err != nil {
+		tx.Rollback()
+		return errors.New("failed to create user account")
 	}
 
-	config.DB.Delete(&otp)
-	return nil
+	asdos := models.AsistenDosen{
+		UserID:      input.ID,
+		NIM:         nim,
+		PhoneNumber: phone,
+	}
+
+	if err := tx.Create(&asdos).Error; err != nil {
+		tx.Rollback()
+		return errors.New("failed to create asisten dosen detail")
+	}
+
+	return tx.Commit().Error
+}
+
+func RegisterKoordinator(input *models.User, nip string) error {
+	tx := config.DB.Begin()
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	input.Password = string(hashedPassword)
+
+	if err := tx.Create(input).Error; err != nil {
+		tx.Rollback()
+		return errors.New("failed to create user account")
+	}
+
+	koor := models.Koordinator{
+		UserID: input.ID,
+		NIP:    nip,
+	}
+
+	if err := tx.Create(&koor).Error; err != nil {
+		tx.Rollback()
+		return errors.New("failed to create koordinator detail")
+	}
+
+	return tx.Commit().Error
+}
+
+func CekAsdos(userID string) *string {
+	var asdos models.AsistenDosen
+	if err := config.DB.Where("user_id = ?", userID).First(&asdos).Error; err != nil {
+		return nil
+	}
+	return &asdos.ID
+}
+
+func CekKoordinator(userID string) *string {
+	var koor models.Koordinator
+	if err := config.DB.Where("user_id = ?", userID).First(&koor).Error; err != nil {
+		return nil
+	}
+	return &koor.ID
 }
 
 func LoginUser(input models.UserLogin) (string, error) {
@@ -117,7 +88,10 @@ func LoginUser(input models.UserLogin) (string, error) {
 		return "", errors.New("incorrect password")
 	}
 
-	return utils.GenerateToken(user.ID, user.Email)
+	idAsisten := CekAsdos(user.ID)
+	idKoordinator := CekKoordinator(user.ID)
+
+	return utils.GenerateToken(user.ID, user.Email, idAsisten, idKoordinator)
 }
 
 func HandleGoogleLogin(email string) (string, error) {
@@ -127,7 +101,10 @@ func HandleGoogleLogin(email string) (string, error) {
 		return "", errors.New("user not found")
 	}
 
-	return utils.GenerateToken(user.ID, user.Email)
+	idAsisten := CekAsdos(user.ID)
+	idKoordinator := CekKoordinator(user.ID)
+
+	return utils.GenerateToken(user.ID, user.Email, idAsisten, idKoordinator)
 }
 
 func ForgotPassword(email string) error {

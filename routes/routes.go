@@ -11,7 +11,6 @@ func SetupRouter() *gin.Engine {
 	// r.Use(RateLimitMiddleware())
 
 	AuthRoutes(r)
-	BookRoutes(r)
 
 	return r
 }

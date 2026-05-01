@@ -7,7 +7,6 @@ import (
 	"altar/utils"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -79,28 +78,11 @@ func GoogleCallback(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, os.Getenv("SUCCESS_FRONTEND_URL")+"?token="+jwtToken)
 }
 
-func RequestOTP(c *gin.Context) {
-	var input struct {
-		Email string `json:"email" binding:"required,email"`
-	}
-	if err := c.ShouldBindJSON(&input); err != nil {
-		utils.SendError(c, http.StatusBadRequest, "Email format is wrong", err)
-		return
-	}
-
-	if err := services.RequestOTP(input.Email); err != nil {
-		fmt.Println(err)
-		utils.SendError(c, http.StatusBadRequest, "Failed to send otp", err)
-		return
-	}
-
-	utils.SendSuccess(c, http.StatusOK, "OTP Code is sent to your email", nil)
-}
-
-func Register(c *gin.Context) {
+func RegisterAsdos(c *gin.Context) {
 	var input struct {
 		models.User
-		OTPCode string `json:"otp_code" binding:"required"`
+		NIM         string `json:"nim"`
+		PhoneNumber string `json:"phone_number"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -108,12 +90,31 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	if err := services.RegisterWithOTP(&input.User, input.OTPCode); err != nil {
+	if err := services.RegisterAsdos(&input.User, input.NIM, input.PhoneNumber); err != nil {
 		utils.SendError(c, http.StatusBadRequest, "Registration Failed", err)
 		return
 	}
 
-	utils.SendSuccess(c, http.StatusCreated, "Registration Success, Please Login", nil)
+	utils.SendSuccess(c, http.StatusCreated, "Asisten Dosen Registered Successfully", nil)
+}
+
+func RegisterKoordinator(c *gin.Context) {
+	var input struct {
+		models.User
+		NIP string `json:"nip"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		utils.SendError(c, http.StatusBadRequest, "Data is not complete", err)
+		return
+	}
+
+	if err := services.RegisterKoordinator(&input.User, input.NIP); err != nil {
+		utils.SendError(c, http.StatusBadRequest, "Registration Failed", err)
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusCreated, "Koordinator Registered Successfully", nil)
 }
 
 func Login(c *gin.Context) {
@@ -137,11 +138,23 @@ func Login(c *gin.Context) {
 func GetMe(c *gin.Context) {
 	id, _ := c.Get("user_id")
 	email, _ := c.Get("user_email")
+	idAsisten, _ := c.Get("id_asisten")
+	idKoordinator, _ := c.Get("id_koordinator")
 
 	utils.SendSuccess(c, http.StatusOK, "Data profilmu berhasil diambil", gin.H{
-		"id":    id,
-		"email": email,
+		"id":             id,
+		"email":          email,
+		"id_asisten":     idAsisten,
+		"id_koordinator": idKoordinator,
 	})
+}
+
+func CheckAsdos(c *gin.Context) {
+	utils.SendSuccess(c, http.StatusOK, "You are an Asisten Dosen", nil)
+}
+
+func CheckKoor(c *gin.Context) {
+	utils.SendSuccess(c, http.StatusOK, "You are a Koordinator", nil)
 }
 
 // Di controller/handler auth kamu

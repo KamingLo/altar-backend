@@ -61,6 +61,32 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		c.Set("user_id", claims["user_id"])
 		c.Set("user_email", claims["email"])
+		c.Set("id_asisten", claims["id_asisten"])
+		c.Set("id_koordinator", claims["id_koordinator"])
+		c.Next()
+	}
+}
+
+func IsAsdosMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, exists := c.Get("id_asisten")
+		if !exists || id == nil || id == "" {
+			utils.SendError(c, http.StatusForbidden, "Access denied: Asisten Dosen only", nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+func IsKoordinatorMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, exists := c.Get("id_koordinator")
+		if !exists || id == nil || id == "" {
+			utils.SendError(c, http.StatusForbidden, "Access denied: Koordinator only", nil)
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
