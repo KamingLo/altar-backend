@@ -14,7 +14,7 @@ type Koordinator struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	UserID string `gorm:"type:varchar(36)" json:"user_id"`
-	NIP    string `json:"nip"`
+	NIP    string `gorm:"column:nip" json:"nip"`
 
 	User User `gorm:"foreignKey:UserID" json:"user"`
 }
