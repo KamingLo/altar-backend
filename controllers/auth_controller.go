@@ -78,45 +78,6 @@ func GoogleCallback(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, os.Getenv("SUCCESS_FRONTEND_URL")+"?token="+jwtToken)
 }
 
-func RegisterAsdos(c *gin.Context) {
-	var input struct {
-		models.User
-		NIM         string `json:"nim"`
-		PhoneNumber string `json:"phone_number"`
-	}
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		utils.SendError(c, http.StatusBadRequest, "Data is not complete", err)
-		return
-	}
-
-	if err := services.RegisterAsdos(&input.User, input.NIM, input.PhoneNumber); err != nil {
-		utils.SendError(c, http.StatusBadRequest, "Registration Failed", err)
-		return
-	}
-
-	utils.SendSuccess(c, http.StatusCreated, "Asisten Dosen Registered Successfully", nil)
-}
-
-func RegisterKoordinator(c *gin.Context) {
-	var input struct {
-		models.User
-		NIP string `json:"nip"`
-	}
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		utils.SendError(c, http.StatusBadRequest, "Data is not complete", err)
-		return
-	}
-
-	if err := services.RegisterKoordinator(&input.User, input.NIP); err != nil {
-		utils.SendError(c, http.StatusBadRequest, "Registration Failed", err)
-		return
-	}
-
-	utils.SendSuccess(c, http.StatusCreated, "Koordinator Registered Successfully", nil)
-}
-
 func Login(c *gin.Context) {
 	var input models.UserLogin
 	if err := c.ShouldBindJSON(&input); err != nil {

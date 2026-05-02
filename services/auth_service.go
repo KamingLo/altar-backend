@@ -12,55 +12,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func RegisterAsdos(input *models.User, nim, phone string) error {
-	tx := config.DB.Begin()
-
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
-	input.Password = string(hashedPassword)
-
-	if err := tx.Create(input).Error; err != nil {
-		tx.Rollback()
-		return errors.New("failed to create user account")
-	}
-
-	asdos := models.AsistenDosen{
-		UserID:      input.ID,
-		NIM:         nim,
-		PhoneNumber: phone,
-	}
-
-	if err := tx.Create(&asdos).Error; err != nil {
-		tx.Rollback()
-		return errors.New("failed to create asisten dosen detail")
-	}
-
-	return tx.Commit().Error
-}
-
-func RegisterKoordinator(input *models.User, nip string) error {
-	tx := config.DB.Begin()
-
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
-	input.Password = string(hashedPassword)
-
-	if err := tx.Create(input).Error; err != nil {
-		tx.Rollback()
-		return errors.New("failed to create user account")
-	}
-
-	koor := models.Koordinator{
-		UserID: input.ID,
-		NIP:    nip,
-	}
-
-	if err := tx.Create(&koor).Error; err != nil {
-		tx.Rollback()
-		return errors.New("failed to create koordinator detail")
-	}
-
-	return tx.Commit().Error
-}
-
 func CekAsdos(userID string) *string {
 	var asdos models.AsistenDosen
 	if err := config.DB.Where("user_id = ?", userID).First(&asdos).Error; err != nil {
