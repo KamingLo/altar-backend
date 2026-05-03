@@ -5,10 +5,17 @@ import (
 	"altar/models"
 	"altar/utils"
 	"errors"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+type UserSummary struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
 
 type AsdosSummary struct {
 	ID       string `json:"id_asdos" gorm:"column:id"`
@@ -22,41 +29,93 @@ type KoorSummary struct {
 	NIP      string `json:"nip" gorm:"column:nip"`
 }
 
+// --- User CRUD ---
+
+func CreateUser(input *models.User) error {
+	input.Email = strings.ToLower(input.Email)
+
+	// Check if user already exists
+	var existingUser models.User
+	if err := config.DB.Where("email = ?", input.Email).First(&existingUser).Error; err == nil {
+		return errors.New("user with this email already exists")
+	}
+
+	randomPassword := utils.GenerateRandomPassword(8)
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(randomPassword), bcrypt.DefaultCost)
+	input.Password = string(hashedPassword)
+
+	if err := config.DB.Create(input).Error; err != nil {
+		return errors.New("failed to create user account")
+	}
+
+	SendNewAccountPassword(input.Email, randomPassword)
+	return nil
+}
+
+func GetAllUsers(page int, search string) ([]UserSummary, error) {
+	var users []UserSummary
+	query := config.DB.Model(&models.User{})
+
+	if search != "" {
+		searchLower := strings.ToLower(search)
+		query = query.Where("username ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+searchLower+"%")
+	}
+
+	offset := (page - 1) * 10
+	if err := query.Limit(10).Offset(offset).Select("id, username, email").Scan(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func GetUserByID(id string) (models.User, error) {
+	var user models.User
+	if err := config.DB.Where("id = ?", id).First(&user).Error; err != nil {
+		return user, err
+	}
+	return user, nil
+}
+
+func UpdateUser(id string, username, email string) error {
+	var user models.User
+	if err := config.DB.Where("id = ?", id).First(&user).Error; err != nil {
+		return errors.New("user not found")
+	}
+
+	user.Username = username
+	user.Email = strings.ToLower(email)
+
+	return config.DB.Save(&user).Error
+}
+
+func DeleteUser(id string) error {
+	return config.DB.Delete(&models.User{}, "id = ?", id).Error
+}
+
 // --- Asisten Dosen CRUD ---
 
-func CreateAsdos(input *models.User, nim, phone string) error {
+func CreateAsdos(userID, nim, phone string) error {
 	tx := config.DB.Begin()
 
+	// Check if user exists
 	var user models.User
-	err := tx.Where("email = ?", input.Email).First(&user).Error
-
-	if err == nil {
-		// User exists, use existing ID
-		input.ID = user.ID
-
-		// Check if already an Asdos
-		var existingAsdos models.AsistenDosen
-		if err := tx.Where("user_id = ?", user.ID).First(&existingAsdos).Error; err == nil {
-			tx.Rollback()
-			return errors.New("user is already registered as Asisten Dosen")
-		}
-	} else if errors.Is(err, gorm.ErrRecordNotFound) {
-		// User doesn't exist, create new
-		randomPassword := utils.GenerateRandomPassword(8)
-		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(randomPassword), bcrypt.DefaultCost)
-		input.Password = string(hashedPassword)
-		if err := tx.Create(input).Error; err != nil {
-			tx.Rollback()
-			return errors.New("failed to create user account")
-		}
-		SendNewAccountPassword(input.Email, randomPassword)
-	} else {
+	if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
 		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("user not found")
+		}
 		return err
 	}
 
+	// Check if already an Asdos
+	var existingAsdos models.AsistenDosen
+	if err := tx.Where("user_id = ?", userID).First(&existingAsdos).Error; err == nil {
+		tx.Rollback()
+		return errors.New("user is already registered as Asisten Dosen")
+	}
+
 	asdos := models.AsistenDosen{
-		UserID:      input.ID,
+		UserID:      userID,
 		NIM:         nim,
 		PhoneNumber: phone,
 	}
@@ -139,39 +198,28 @@ func DeleteAsdos(id string) error {
 
 // --- Koordinator CRUD ---
 
-func CreateKoordinator(input *models.User, nip string) error {
+func CreateKoordinator(userID, nip string) error {
 	tx := config.DB.Begin()
 
+	// Check if user exists
 	var user models.User
-	err := tx.Where("email = ?", input.Email).First(&user).Error
-
-	if err == nil {
-		// User exists
-		input.ID = user.ID
-
-		// Check if already a Koordinator
-		var existingKoor models.Koordinator
-		if err := tx.Where("user_id = ?", user.ID).First(&existingKoor).Error; err == nil {
-			tx.Rollback()
-			return errors.New("user is already registered as Koordinator")
-		}
-	} else if errors.Is(err, gorm.ErrRecordNotFound) {
-		// User doesn't exist
-		randomPassword := utils.GenerateRandomPassword(8)
-		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(randomPassword), bcrypt.DefaultCost)
-		input.Password = string(hashedPassword)
-		if err := tx.Create(input).Error; err != nil {
-			tx.Rollback()
-			return errors.New("failed to create user account")
-		}
-		SendNewAccountPassword(input.Email, randomPassword)
-	} else {
+	if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
 		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("user not found")
+		}
 		return err
 	}
 
+	// Check if already a Koordinator
+	var existingKoor models.Koordinator
+	if err := tx.Where("user_id = ?", userID).First(&existingKoor).Error; err == nil {
+		tx.Rollback()
+		return errors.New("user is already registered as Koordinator")
+	}
+
 	koor := models.Koordinator{
-		UserID: input.ID,
+		UserID: userID,
 		NIP:    nip,
 	}
 

@@ -12,6 +12,8 @@ func SetupRouter() *gin.Engine {
 
 	AuthRoutes(r)
 	UserRoutes(r)
+	AsdosRoutes(r)
+	KoorRoutes(r)
 
 	return r
 }
