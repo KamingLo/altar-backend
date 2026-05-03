@@ -58,7 +58,7 @@ func GetAllUsers(page int, search string) ([]UserSummary, error) {
 
 	if search != "" {
 		searchLower := strings.ToLower(search)
-		query = query.Where("username ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+searchLower+"%")
+		query = query.Where("(username ILIKE ? OR email ILIKE ?)", "%"+search+"%", "%"+searchLower+"%")
 	}
 
 	offset := (page - 1) * 10
@@ -73,6 +73,7 @@ func GetUserByID(id string) (models.User, error) {
 	if err := config.DB.Where("id = ?", id).First(&user).Error; err != nil {
 		return user, err
 	}
+	user.Password = ""
 	return user, nil
 }
 
@@ -82,14 +83,21 @@ func UpdateUser(id string, username, email string) error {
 		return errors.New("user not found")
 	}
 
+	// Check if new email is already taken by another user
+	email = strings.ToLower(email)
+	var existingUser models.User
+	if err := config.DB.Where("email = ? AND id != ?", email, id).First(&existingUser).Error; err == nil {
+		return errors.New("email already in use by another account")
+	}
+
 	user.Username = username
-	user.Email = strings.ToLower(email)
+	user.Email = email
 
 	return config.DB.Save(&user).Error
 }
 
 func DeleteUser(id string) error {
-	return config.DB.Delete(&models.User{}, "id = ?", id).Error
+	return config.DB.Unscoped().Delete(&models.User{}, "id = ?", id).Error
 }
 
 // --- Asisten Dosen CRUD ---
@@ -130,12 +138,13 @@ func CreateAsdos(userID, nim, phone string) error {
 
 func GetAllAsdos(page int, search string) ([]AsdosSummary, error) {
 	var asdos []AsdosSummary
-	query := config.DB.Table("asisten_dosens").
+	query := config.DB.Model(&models.AsistenDosen{}).
 		Select("asisten_dosens.id, users.username, asisten_dosens.nim").
-		Joins("left join users on users.id = asisten_dosens.user_id")
+		Joins("left join users on users.id = asisten_dosens.user_id").
+		Where("users.deleted_at IS NULL")
 
 	if search != "" {
-		query = query.Where("users.username ILIKE ? OR asisten_dosens.nim LIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("(users.username ILIKE ? OR asisten_dosens.nim LIKE ?)", "%"+search+"%", "%"+search+"%")
 	}
 
 	offset := (page - 1) * 10
@@ -176,7 +185,7 @@ func DeleteAsdos(id string) error {
 
 	userID := asdos.UserID
 
-	if err := tx.Delete(&asdos).Error; err != nil {
+	if err := tx.Unscoped().Delete(&asdos).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -187,7 +196,7 @@ func DeleteAsdos(id string) error {
 
 	// If no other roles, delete user
 	if errors.Is(errKoor, gorm.ErrRecordNotFound) {
-		if err := tx.Delete(&models.User{}, "id = ?", userID).Error; err != nil {
+		if err := tx.Unscoped().Delete(&models.User{}, "id = ?", userID).Error; err != nil {
 			tx.Rollback()
 			return err
 		}
@@ -233,12 +242,13 @@ func CreateKoordinator(userID, nip string) error {
 
 func GetAllKoordinator(page int, search string) ([]KoorSummary, error) {
 	var koor []KoorSummary
-	query := config.DB.Table("koordinators").
+	query := config.DB.Model(&models.Koordinator{}).
 		Select("koordinators.id, users.username, koordinators.nip").
-		Joins("left join users on users.id = koordinators.user_id")
+		Joins("left join users on users.id = koordinators.user_id").
+		Where("users.deleted_at IS NULL")
 
 	if search != "" {
-		query = query.Where("users.username ILIKE ? OR koordinators.NIP LIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("(users.username ILIKE ? OR koordinators.NIP LIKE ?)", "%"+search+"%", "%"+search+"%")
 	}
 
 	offset := (page - 1) * 10
@@ -278,7 +288,7 @@ func DeleteKoordinator(id string) error {
 
 	userID := koor.UserID
 
-	if err := tx.Delete(&koor).Error; err != nil {
+	if err := tx.Unscoped().Delete(&koor).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -289,7 +299,7 @@ func DeleteKoordinator(id string) error {
 
 	// If no other roles, delete user
 	if errors.Is(errAsdos, gorm.ErrRecordNotFound) {
-		if err := tx.Delete(&models.User{}, "id = ?", userID).Error; err != nil {
+		if err := tx.Unscoped().Delete(&models.User{}, "id = ?", userID).Error; err != nil {
 			tx.Rollback()
 			return err
 		}
