@@ -6,3 +6,4 @@ tmp
 !.env.example
 altar-api
 *.sh
+*.ps1
