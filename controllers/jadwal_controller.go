@@ -1,80 +1,149 @@
 package controllers
 
 import (
-	"altar/models"
 	"altar/services"
 	"altar/utils"
 	"net/http"
-	"time"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-type CreateSessionRequest struct {
-	IDKelas       string  `json:"id_kelas" binding:"required"`
-	IDMk          string  `json:"id_mk" binding:"required"`
-	IDSemester    string  `json:"id_semester" binding:"required"`
-	IDRuangan     string  `json:"id_ruangan" binding:"required"`
-	IDAsdos1      *string `json:"id_asdos1"`
-	IDAsdos2      *string `json:"id_asdos2"`
-	IDDosen       *string `json:"id_dosen"`
-	KelasMulai    string  `json:"kelas_mulai" binding:"required"`
-	KelasBerakhir string  `json:"kelas_berakhir" binding:"required"`
+// ─────────────────────────────────────────────
+// Request DTO
+// ─────────────────────────────────────────────
+
+type SessionRequest struct {
+	IDKelas    string  `json:"id_kelas"    binding:"required"`
+	IDMk       string  `json:"id_mk"       binding:"required"`
+	IDSemester string  `json:"id_semester" binding:"required"`
+	IDRuangan  string  `json:"id_ruangan"  binding:"required"`
+	IDAsdos1   *string `json:"id_asdos1"`
+	IDAsdos2   *string `json:"id_asdos2"`
+	IDDosen    *string `json:"id_dosen"`
+	DayOption  int     `json:"opsi_hari"   binding:"required,min=1,max=6"`
+	SlotOption int     `json:"opsi_jam"    binding:"required,min=1,max=7"`
 }
 
+// ─────────────────────────────────────────────
+// Internal: toSessionInput
+// Maps the HTTP request DTO to the service input struct.
+// ─────────────────────────────────────────────
+
+func toSessionInput(req *SessionRequest) *services.SessionInput {
+	return &services.SessionInput{
+		IDKelas:    req.IDKelas,
+		IDMk:       req.IDMk,
+		IDSemester: req.IDSemester,
+		IDRuangan:  req.IDRuangan,
+		IDAsdos1:   req.IDAsdos1,
+		IDAsdos2:   req.IDAsdos2,
+		IDDosen:    req.IDDosen,
+		DayOption:  req.DayOption,
+		SlotOption: req.SlotOption,
+	}
+}
+
+// ─────────────────────────────────────────────
+// POST /sessions
+// ─────────────────────────────────────────────
+
 func CreateSession(c *gin.Context) {
-	var req CreateSessionRequest
+	var req SessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.SendError(c, http.StatusBadRequest, "Invalid request payload or missing required fields", err)
 		return
 	}
 
-	// Handle empty string input as nil for optional fields
-	if req.IDDosen != nil && *req.IDDosen == "" {
-		req.IDDosen = nil
-	}
-	if req.IDAsdos1 != nil && *req.IDAsdos1 == "" {
-		req.IDAsdos1 = nil
-	}
-	if req.IDAsdos2 != nil && *req.IDAsdos2 == "" {
-		req.IDAsdos2 = nil
-	}
-
-	// Time Parsing (RFC3339)
-	startTime, err := time.Parse(time.RFC3339, req.KelasMulai)
+	resp, err := services.CreateSession(toSessionInput(&req))
 	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, "Invalid 'kelas_mulai' format. Use ISO8601/RFC3339", err)
-		return
-	}
-
-	endTime, err := time.Parse(time.RFC3339, req.KelasBerakhir)
-	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, "Invalid 'kelas_berakhir' format. Use ISO8601/RFC3339", err)
-		return
-	}
-
-	// Logic Validation
-	if endTime.Before(startTime) || endTime.Equal(startTime) {
-		utils.SendError(c, http.StatusBadRequest, "Class end time must be after start time", nil)
-		return
-	}
-
-	session := models.JadwalUtama{
-		IDKelas:       req.IDKelas,
-		IDMk:          req.IDMk,
-		IDSemester:    req.IDSemester,
-		IDRuangan:     req.IDRuangan,
-		IDAsdos1:      req.IDAsdos1,
-		IDAsdos2:      req.IDAsdos2,
-		IDDosen:       req.IDDosen,
-		KelasMulai:    startTime,
-		KelasBerakhir: endTime,
-	}
-
-	if err := services.CreateSession(&session); err != nil {
 		utils.SendError(c, http.StatusBadRequest, "Failed to create session", err.Error())
 		return
 	}
 
-	utils.SendSuccess(c, http.StatusCreated, "Session created successfully", session)
+	utils.SendSuccess(c, http.StatusCreated, "Session created successfully", resp)
+}
+
+// ─────────────────────────────────────────────
+// GET /sessions?page=1&limit=10&id_semester=...
+// ─────────────────────────────────────────────
+
+func GetAllSessions(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	semesterID := c.Query("id_semester")
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+
+	data, total, err := services.GetAllSessions(page, limit, semesterID)
+	if err != nil {
+		utils.SendError(c, http.StatusInternalServerError, "Failed to fetch sessions", err)
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Sessions fetched successfully", gin.H{
+		"items":      data,
+		"total":      total,
+		"page":       page,
+		"limit":      limit,
+		"total_page": (total + int64(limit) - 1) / int64(limit),
+	})
+}
+
+// ─────────────────────────────────────────────
+// GET /sessions/:id
+// ─────────────────────────────────────────────
+
+func GetSessionByID(c *gin.Context) {
+	id := c.Param("id")
+
+	resp, err := services.GetSessionByID(id)
+	if err != nil {
+		utils.SendError(c, http.StatusNotFound, "Session not found", err.Error())
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Session fetched successfully", resp)
+}
+
+// ─────────────────────────────────────────────
+// PATCH /sessions/:id
+// ─────────────────────────────────────────────
+
+func UpdateSession(c *gin.Context) {
+	id := c.Param("id")
+
+	var req SessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.SendError(c, http.StatusBadRequest, "Invalid request payload or missing required fields", err)
+		return
+	}
+
+	resp, err := services.UpdateSession(id, toSessionInput(&req))
+	if err != nil {
+		utils.SendError(c, http.StatusBadRequest, "Failed to update session", err.Error())
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Session updated successfully", resp)
+}
+
+// ─────────────────────────────────────────────
+// DELETE /sessions/:id
+// ─────────────────────────────────────────────
+
+func DeleteSession(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := services.DeleteSession(id); err != nil {
+		utils.SendError(c, http.StatusNotFound, "Failed to delete session", err.Error())
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Session deleted successfully", nil)
 }
