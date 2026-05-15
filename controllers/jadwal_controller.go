@@ -4,7 +4,7 @@ import (
 	"altar/services"
 	"altar/utils"
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -69,29 +69,35 @@ func CreateSession(c *gin.Context) {
 // ─────────────────────────────────────────────
 
 func GetAllSessions(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
 	semesterID := c.Query("id_semester")
 
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 10
+	if semesterID == "" {
+		utils.SendError(c, http.StatusBadRequest, "Missing parameter", "'id_semester' is required")
+		return
 	}
 
-	data, total, err := services.GetAllSessions(page, limit, semesterID)
+	// Default to a 7-day timeline starting today if dates are not provided
+	if startDate == "" {
+		startDate = time.Now().Format("2006-01-02")
+	}
+	if endDate == "" {
+		endDate = time.Now().AddDate(0, 0, 7).Format("2006-01-02")
+	}
+
+	data, err := services.GetTimelineJadwal(startDate, endDate, semesterID, "")
 	if err != nil {
-		utils.SendError(c, http.StatusInternalServerError, "Failed to fetch sessions", err)
+		utils.SendError(c, http.StatusInternalServerError, "Failed to fetch sessions timeline", err.Error())
 		return
 	}
 
 	utils.SendSuccess(c, http.StatusOK, "Sessions fetched successfully", gin.H{
-		"items":      data,
-		"total":      total,
-		"page":       page,
-		"limit":      limit,
-		"total_page": (total + int64(limit) - 1) / int64(limit),
+		"start_date":  startDate,
+		"end_date":    endDate,
+		"id_semester": semesterID,
+		"total":       len(data),
+		"items":       data,
 	})
 }
 
@@ -147,3 +153,34 @@ func DeleteSession(c *gin.Context) {
 
 	utils.SendSuccess(c, http.StatusOK, "Session deleted successfully", nil)
 }
+
+// ─────────────────────────────────────────────
+// GET /sessions/me
+// ─────────────────────────────────────────────
+
+func GetMySession(c *gin.Context) {
+	idAsistenRaw, exists := c.Get("id_asisten")
+	if !exists || idAsistenRaw == nil {
+		utils.SendError(c, http.StatusForbidden, "Forbidden", "id_asisten not found in context")
+		return
+	}
+	idAsisten, ok := idAsistenRaw.(string)
+	if !ok || idAsisten == "" {
+		utils.SendError(c, http.StatusForbidden, "Forbidden", "invalid id_asisten type")
+		return
+	}
+
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		dateStr = time.Now().Format("2006-01-02")
+	}
+
+	resp, err := services.GetDailyAssistantSessions(dateStr, idAsisten)
+	if err != nil {
+		utils.SendError(c, http.StatusInternalServerError, "Failed to fetch daily sessions", err.Error())
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Daily sessions fetched successfully", resp)
+}
+

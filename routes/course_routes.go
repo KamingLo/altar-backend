@@ -8,6 +8,7 @@ import (
 
 func CourseRoutes(r *gin.Engine) {
 	course := r.Group("/courses")
+	course.Use(AuthMiddleware(), IsKoordinatorMiddleware())
 	{
 		course.POST("/", controllers.CreateCourse)
 		course.GET("/", controllers.GetAllCourses)

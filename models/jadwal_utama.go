@@ -21,6 +21,15 @@ type JadwalUtama struct {
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// TAMBAHKAN BAGIAN INI AGAR GORM BISA MELAKUKAN PRELOAD
+	Kelas      Kelas         `gorm:"foreignKey:IDKelas" json:"kelas,omitempty"`
+	MataKuliah MataKuliah    `gorm:"foreignKey:IDMk" json:"mata_kuliah,omitempty"`
+	Ruangan    Ruangan       `gorm:"foreignKey:IDRuangan" json:"ruangan,omitempty"`
+	Dosen      *Dosen        `gorm:"foreignKey:IDDosen" json:"dosen,omitempty"`
+	Asdos1     *AsistenDosen `gorm:"foreignKey:IDAsdos1" json:"asdos1,omitempty"`
+	Asdos2     *AsistenDosen `gorm:"foreignKey:IDAsdos2" json:"asdos2,omitempty"`
+	Semester   Semester      `gorm:"foreignKey:IDSemester" json:"semester,omitempty"`
 }
 
 func init() {

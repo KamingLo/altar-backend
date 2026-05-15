@@ -5,6 +5,7 @@ import (
 	"altar/models"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -73,12 +74,19 @@ type SessionInput struct {
 // ─────────────────────────────────────────────
 
 type SessionResponse struct {
-	ID          string `json:"id_sesi"`
-	NamaKelas   string `json:"nama_kelas"`
-	MataKuliah  string `json:"mata_kuliah"`
-	Ruangan     string `json:"ruangan"`  // Format: "Room Name (Floor X)"
-	Pengajar    string `json:"pengajar"` // Format: Lecturer name OR "Asdos1 & Asdos2" OR "Asdos1"
-	Waktu       string `json:"waktu"`    // Format: "Senin, 07:30 - 09:10"
+	ID         string `json:"id_sesi"`
+	NamaKelas  string `json:"nama_kelas"`
+	MataKuliah string `json:"mata_kuliah"`
+	Ruangan    string `json:"ruangan"`  // Format: "Room Name (Floor X)"
+	Pengajar   string `json:"pengajar"` // Format: Lecturer name OR "Asdos1 & Asdos2" OR "Asdos1"
+	Waktu      string `json:"waktu"`    // Format: "Senin, 07:30 - 09:10"
+}
+
+// DailySessionResponse adalah gabungan antara response standar
+// dengan label tipe untuk membedakan jadwal reguler dan pengganti.
+type DailySessionResponse struct {
+	SessionResponse
+	TipeJadwal string `json:"tipe_jadwal"` // "REGULAR" atau "PENGGANTI"
 }
 
 // ─────────────────────────────────────────────
@@ -543,4 +551,114 @@ func DeleteSession(id string) error {
 		return fmt.Errorf("session with ID %s not found", id)
 	}
 	return config.DB.Delete(&session).Error
+}
+
+func GetDailyAssistantSessions(dateStr string, assistantID string) ([]DailySessionResponse, error) {
+	db := config.DB
+	var results []DailySessionResponse
+
+	// 1. Parse Target Date
+	targetDate, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		log.Printf("[ScheduleService] Failed to parse date %s: %v", dateStr, err)
+		return nil, fmt.Errorf("invalid date format, use YYYY-MM-DD")
+	}
+	targetDow := int(targetDate.Weekday()) // 0=Sunday, 1=Monday, ..., 6=Saturday
+
+	// 2. Fetch Regular Schedules (Based on day of week)
+	var regularSchedules []models.JadwalUtama
+	// Using EXTRACT(DOW) for PostgreSQL compatibility
+	if err := db.Where("(id_asdos1 = ? OR id_asdos2 = ?) AND EXTRACT(DOW FROM kelas_mulai) = ?", assistantID, assistantID, targetDow).Find(&regularSchedules).Error; err != nil {
+		log.Printf("[ScheduleService] Error fetching regular schedules for assistant %s: %v", assistantID, err)
+		return nil, fmt.Errorf("failed to fetch regular schedules: %w", err)
+	}
+
+	// 3. BLACKLIST: Find sessions cancelled/moved on this specific date
+	var blacklistSubs []models.SubstituteSession
+	if err := db.Where("status = ? AND original_date = ?", models.StatusVerified, dateStr).Find(&blacklistSubs).Error; err != nil {
+		log.Printf("[ScheduleService] Error fetching blacklist for date %s: %v", dateStr, err)
+		return nil, fmt.Errorf("failed to check cancelled classes: %w", err)
+	}
+	blacklist := make(map[string]bool)
+	for _, sub := range blacklistSubs {
+		blacklist[sub.IDSession] = true
+	}
+
+	// 4. Process Regular Schedules into Results (Skip blacklisted)
+	for i := range regularSchedules {
+		if blacklist[regularSchedules[i].ID] {
+			continue // SKIP! This session is cancelled/moved today
+		}
+
+		resp, err := loadSessionRelations(&regularSchedules[i])
+		if err != nil {
+			log.Printf("[ScheduleService] Failed to load relations for session %s: %v", regularSchedules[i].ID, err)
+			continue
+		}
+
+		// Update Waktu format: "YYYY-MM-DD, HH:MM - HH:MM"
+		resp.Waktu = fmt.Sprintf("%s, %s - %s",
+			dateStr,
+			regularSchedules[i].KelasMulai.In(wib).Format("15:04"),
+			regularSchedules[i].KelasBerakhir.In(wib).Format("15:04"),
+		)
+
+		results = append(results, DailySessionResponse{
+			SessionResponse: resp,
+			TipeJadwal:      "REGULAR",
+		})
+	}
+
+	// 5. SUBSTITUTE SESSIONS: Fetch using optimized GORM JOINs
+	var substituteSessions []models.SubstituteSession
+	err = db.Preload("Session").
+		Preload("AsdosPengganti").Preload("AsdosPengganti.User").
+		Joins("JOIN jadwal_utamas ON jadwal_utamas.id = substitute_sessions.id_session").
+		Where("substitute_sessions.status = ? AND substitute_sessions.substitute_date = ?", models.StatusVerified, dateStr).
+		Where("(substitute_sessions.id_asdos_pengganti = ?) OR (substitute_sessions.id_asdos_pengganti IS NULL AND (jadwal_utamas.id_asdos1 = ? OR jadwal_utamas.id_asdos2 = ?))",
+			assistantID, assistantID, assistantID).
+		Find(&substituteSessions).Error
+
+	if err != nil {
+		log.Printf("[ScheduleService] Error fetching substitute sessions for assistant %s on %s: %v", assistantID, dateStr, err)
+		return nil, fmt.Errorf("failed to fetch substitute sessions: %w", err)
+	}
+
+	// 6. Process Substitute Sessions into Results
+	for i := range substituteSessions {
+		sub := &substituteSessions[i]
+
+		if sub.Session == nil {
+			log.Printf("[ScheduleService] Substitute session %s has no linked main session", sub.ID)
+			continue
+		}
+
+		resp, err := loadSessionRelations(sub.Session)
+		if err != nil {
+			log.Printf("[ScheduleService] Failed to load main relations for sub session %s: %v", sub.ID, err)
+			continue
+		}
+
+		// Override Pengajar if there is a substitute assistant
+		if sub.AsdosPengganti != nil {
+			resp.Pengajar = sub.AsdosPengganti.User.Username
+		}
+
+		// Override Waktu: "YYYY-MM-DD, HH:MM - HH:MM"
+		resp.Waktu = fmt.Sprintf("%s, %s - %s",
+			dateStr,
+			sub.KelasMulai.In(wib).Format("15:04"),
+			sub.KelasBerakhir.In(wib).Format("15:04"),
+		)
+
+		log.Printf("[ScheduleService] Including substitute session: %s (%s) for assistant %s",
+			resp.MataKuliah, resp.NamaKelas, resp.Pengajar)
+
+		results = append(results, DailySessionResponse{
+			SessionResponse: resp,
+			TipeJadwal:      "PENGGANTI",
+		})
+	}
+
+	return results, nil
 }

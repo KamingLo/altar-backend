@@ -5,6 +5,7 @@ import (
 	"altar/models"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -13,11 +14,13 @@ import (
 // ─────────────────────────────────────────────
 
 type SubstituteSessionInput struct {
-	IDSession      string `json:"id_session"`
-	IDRuangan      string `json:"id_ruangan"`
-	SubstituteDate string `json:"substitute_date"` // YYYY-MM-DD
-	SlotOption     int    `json:"slot_option"`     // 1–7
-	Reason         string `json:"reason"`
+	IDSession        string  `json:"id_session"`
+	IDRuangan        string  `json:"id_ruangan"`
+	IDAsdosPengganti *string `json:"id_asdos_pengganti"` // optional — nil if the original teacher handles it
+	SubstituteDate   string  `json:"substitute_date"`    // YYYY-MM-DD
+	OriginalDate     string  `json:"original_date"`      // YYYY-MM-DD (cancelled regular date)
+	SlotOption       int     `json:"slot_option"`        // 1–7
+	Reason           string  `json:"reason"`
 }
 
 // ─────────────────────────────────────────────
@@ -33,22 +36,41 @@ type UpdateSubstituteStatusInput struct {
 // ─────────────────────────────────────────────
 
 type SubstituteSessionResponse struct {
-	ID             string                         `json:"id"`
-	Status         models.SubstituteSessionStatus `json:"status"`
-	Reason         string                         `json:"reason"`
-	SubstituteDate string                         `json:"substitute_date"` // YYYY-MM-DD
-	TimeSlot       string                         `json:"time_slot"`       // "HH:mm – HH:mm"
-	Room           string                         `json:"room"`            // "Name (Floor X)"
-	Session        *SessionResponse               `json:"session,omitempty"`
-	CreatedAt      time.Time                      `json:"created_at"`
-	UpdatedAt      time.Time                      `json:"updated_at"`
+	ID                string                         `json:"id"`
+	Status            models.SubstituteSessionStatus `json:"status"`
+	Reason            string                         `json:"reason"`
+	SubstituteDate    string                         `json:"substitute_date"`    // YYYY-MM-DD
+	OriginalDate      string                         `json:"original_date"`      // YYYY-MM-DD
+	TimeSlot          string                         `json:"time_slot"`          // "HH:mm – HH:mm"
+	Room              string                         `json:"room"`               // "Name (Floor X)"
+	SubstituteTeacher string                         `json:"substitute_teacher"` // name of the replacement asdos, empty if none
+	Session           *SessionResponse               `json:"session,omitempty"`
+	CreatedAt         time.Time                      `json:"created_at"`
+	UpdatedAt         time.Time                      `json:"updated_at"`
+}
+
+// ─────────────────────────────────────────────
+// DTO: UnifiedJadwalResponse
+// Used by GetScheduleByPeriod (Timeline Projection).
+// Represents either a regular (REGULER) or substitute (PENGGANTI) session
+// for a specific calendar date.
+// ─────────────────────────────────────────────
+
+type UnifiedJadwalResponse struct {
+	IDSesi     string `json:"id_sesi"`
+	Tipe       string `json:"tipe"`    // "REGULER" | "PENGGANTI"
+	Tanggal    string `json:"tanggal"` // YYYY-MM-DD
+	NamaKelas  string `json:"nama_kelas"`
+	MataKuliah string `json:"mata_kuliah"`
+	Ruangan    string `json:"ruangan"`  // "Nama Ruangan (Lantai X)"
+	Pengajar   string `json:"pengajar"` // Nama dosen / "Asdos1 & Asdos2"
+	Waktu      string `json:"waktu"`    // "HH:mm - HH:mm"
 }
 
 // ─────────────────────────────────────────────
 // Internal: translateSubstituteSchedule
 // Converts a concrete date string (YYYY-MM-DD) + slot option into
 // two WIB time.Time values (KelasMulai, KelasBerakhir).
-// The date preserves the real calendar day of the substitute class.
 // ─────────────────────────────────────────────
 
 func translateSubstituteSchedule(dateStr string, slotOption int) (time.Time, time.Time, error) {
@@ -93,12 +115,13 @@ func checkSubstituteClash(roomID string, startTime, endTime time.Time, excludeID
 	//    what matters for a weekly repeating schedule. We compare the week day
 	//    and the time window by checking the stored kelas_mulai/kelas_berakhir
 	//    times that fall on the same weekday AND overlap in clock time.
-	//    Simplest portable approach: compare weekday number and clock-time overlap.
-	weekday := int(startTime.Weekday()) // 0=Sun…6=Sat; JadwalUtama day 1=Mon → weekday 1
+	weekday := int(startTime.Weekday()) // Go: 0=Sun, 1=Mon, ..., 6=Sat
+
+	// Gunakan sintaks PostgreSQL: EXTRACT(DOW) dan casting ::time
 	if err := db.Model(&models.JadwalUtama{}).
 		Where("id_ruangan = ?", roomID).
-		Where("DAYOFWEEK(kelas_mulai) = ?", weekday+1). // MySQL: 1=Sun, 2=Mon…
-		Where("TIME(kelas_mulai) < TIME(?) AND TIME(kelas_berakhir) > TIME(?)",
+		Where("EXTRACT(DOW FROM kelas_mulai) = ?", weekday).
+		Where("kelas_mulai::time < ?::time AND kelas_berakhir::time > ?::time",
 			endTime, startTime).
 		Count(&count).Error; err != nil {
 		return fmt.Errorf("failed to check main session room conflict: %w", err)
@@ -127,6 +150,55 @@ func checkSubstituteClash(roomID string, startTime, endTime time.Time, excludeID
 }
 
 // ─────────────────────────────────────────────
+// Internal: checkSubstituteTeacherClash
+// Ensures a designated substitute teacher (asdos) has no conflicting
+// schedule at the proposed substitute date and time slot.
+//
+// Two conflict sources are checked:
+//   A. Regular sessions (JadwalUtama): same weekday + overlapping time.
+//   B. Other SubstituteSessions (PENDING or VERIFIED): same exact date + overlapping time.
+// ─────────────────────────────────────────────
+
+func checkSubstituteTeacherClash(teacherID string, startTime, endTime time.Time, excludeID string) error {
+	db := config.DB
+	var count int64
+
+	weekday := int(startTime.Weekday()) // Go: 0=Sun, 1=Mon, ..., 6=Sat
+
+	// A. Conflict against JadwalUtama (regular sessions).
+	//    Match on weekday (DOW) and overlapping clock time.
+	if err := db.Model(&models.JadwalUtama{}).
+		Where("(id_asdos1 = ? OR id_asdos2 = ?)", teacherID, teacherID).
+		Where("EXTRACT(DOW FROM kelas_mulai) = ?", weekday).
+		Where("kelas_mulai::time < ?::time AND kelas_berakhir::time > ?::time", endTime, startTime).
+		Count(&count).Error; err != nil {
+		return fmt.Errorf("failed to check substitute teacher regular session conflict: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("substitute teacher already has a regular class on this weekday and time slot")
+	}
+
+	// B. Conflict against other SubstituteSessions (PENDING or VERIFIED).
+	//    The teacher may appear as the substitute teacher in another request.
+	query := db.Model(&models.SubstituteSession{}).
+		Where("id_asdos_pengganti = ?", teacherID).
+		Where("status IN (?)", []models.SubstituteSessionStatus{models.StatusPending, models.StatusVerified}).
+		Where("kelas_mulai < ? AND kelas_berakhir > ?", endTime, startTime)
+	if excludeID != "" {
+		query = query.Where("id != ?", excludeID)
+	}
+	count = 0
+	if err := query.Count(&count).Error; err != nil {
+		return fmt.Errorf("failed to check substitute teacher session conflict: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("substitute teacher already has a teaching schedule at that time")
+	}
+
+	return nil
+}
+
+// ─────────────────────────────────────────────
 // Internal: buildSubstituteResponse
 // Builds the response DTO from a fully preloaded SubstituteSession.
 // ─────────────────────────────────────────────
@@ -143,6 +215,13 @@ func buildSubstituteResponse(sub *models.SubstituteSession) SubstituteSessionRes
 	)
 
 	dateStr := sub.SubstituteDate.In(wib).Format("2006-01-02")
+	originalDateStr := sub.OriginalDate.In(wib).Format("2006-01-02")
+
+	// Resolve substitute teacher name (empty string when none is assigned)
+	substituteTeacherName := ""
+	if sub.AsdosPengganti != nil {
+		substituteTeacherName = sub.AsdosPengganti.User.Username // AsistenDosen.User.Username is the display name
+	}
 
 	var sessionResp *SessionResponse
 	if sub.Session != nil {
@@ -153,21 +232,118 @@ func buildSubstituteResponse(sub *models.SubstituteSession) SubstituteSessionRes
 	}
 
 	return SubstituteSessionResponse{
-		ID:             sub.ID,
-		Status:         sub.Status,
-		Reason:         sub.Reason,
-		SubstituteDate: dateStr,
-		TimeSlot:       timeSlot,
-		Room:           roomStr,
-		Session:        sessionResp,
-		CreatedAt:      sub.CreatedAt,
-		UpdatedAt:      sub.UpdatedAt,
+		ID:                sub.ID,
+		Status:            sub.Status,
+		Reason:            sub.Reason,
+		SubstituteDate:    dateStr,
+		OriginalDate:      originalDateStr,
+		TimeSlot:          timeSlot,
+		Room:              roomStr,
+		SubstituteTeacher: substituteTeacherName,
+		Session:           sessionResp,
+		CreatedAt:         sub.CreatedAt,
+		UpdatedAt:         sub.UpdatedAt,
+	}
+}
+
+// ─────────────────────────────────────────────
+// Internal: formatInstructor
+// Returns the instructor display string for a JadwalUtama session.
+// When a substitute teacher is provided, their name is returned with
+// "(Substitute Teacher)" appended; otherwise the original instructor
+// of the session is used.
+// ─────────────────────────────────────────────
+
+func formatInstructor(session *models.JadwalUtama, substituteTeacher *models.AsistenDosen) string {
+	// If a substitute teacher has taken over, show their name with a label.
+	if substituteTeacher != nil {
+		return fmt.Sprintf("%s (Substitute Teacher)", substituteTeacher.User.Username)
+	}
+
+	// Fall back to the original session instructor.
+	switch {
+	case session.Dosen != nil:
+		return session.Dosen.Nama
+	case session.Asdos1 != nil && session.Asdos2 != nil:
+		return fmt.Sprintf("%s & %s", session.Asdos1.User.Username, session.Asdos2.User.Username)
+	case session.Asdos1 != nil:
+		return session.Asdos1.User.Username
+	default:
+		return "-"
+	}
+}
+
+// ─────────────────────────────────────────────
+// Internal: buildUnifiedFromRegular
+// Converts a JadwalUtama into a UnifiedJadwalResponse for a specific calendar date.
+// ─────────────────────────────────────────────
+
+func buildUnifiedFromRegular(session *models.JadwalUtama, date time.Time) UnifiedJadwalResponse {
+	ruanganStr := fmt.Sprintf("%s (Lantai %d)", session.Ruangan.NamaRuangan, session.Ruangan.Lantai)
+
+	waktu := fmt.Sprintf("%s - %s",
+		session.KelasMulai.In(wib).Format("15:04"),
+		session.KelasBerakhir.In(wib).Format("15:04"),
+	)
+
+	return UnifiedJadwalResponse{
+		IDSesi:     session.ID,
+		Tipe:       "REGULER",
+		Tanggal:    date.Format("2006-01-02"),
+		NamaKelas:  session.Kelas.NamaKelas,
+		MataKuliah: session.MataKuliah.NamaMK,
+		Ruangan:    ruanganStr,
+		Pengajar:   formatInstructor(session, nil), // regular session: no substitute teacher
+		Waktu:      waktu,
+	}
+}
+
+// ─────────────────────────────────────────────
+// Internal: buildUnifiedFromSubstitute
+// Converts a VERIFIED SubstituteSession into a UnifiedJadwalResponse.
+// Uses formatInstructor: if a SubstituteTeacher is set, their name is shown
+// with "(Substitute Teacher)"; otherwise the original session instructor is used.
+// ─────────────────────────────────────────────
+
+func buildUnifiedFromSubstitute(sub *models.SubstituteSession) UnifiedJadwalResponse {
+	ruanganStr := ""
+	if sub.Ruangan != nil {
+		ruanganStr = fmt.Sprintf("%s (Lantai %d)", sub.Ruangan.NamaRuangan, sub.Ruangan.Lantai)
+	}
+
+	// Resolve instructor: substitute teacher takes priority over the original one.
+	instructorStr := "-"
+	if sub.Session != nil {
+		instructorStr = formatInstructor(sub.Session, sub.AsdosPengganti)
+	}
+
+	namaKelas := ""
+	mataKuliah := ""
+	if sub.Session != nil {
+		namaKelas = sub.Session.Kelas.NamaKelas
+		mataKuliah = sub.Session.MataKuliah.NamaMK
+	}
+
+	waktu := fmt.Sprintf("%s - %s",
+		sub.KelasMulai.In(wib).Format("15:04"),
+		sub.KelasBerakhir.In(wib).Format("15:04"),
+	)
+
+	return UnifiedJadwalResponse{
+		IDSesi:     sub.ID,
+		Tipe:       "PENGGANTI",
+		Tanggal:    sub.SubstituteDate.In(wib).Format("2006-01-02"),
+		NamaKelas:  namaKelas,
+		MataKuliah: mataKuliah,
+		Ruangan:    ruanganStr,
+		Pengajar:   instructorStr,
+		Waktu:      waktu,
 	}
 }
 
 // ─────────────────────────────────────────────
 // Service: CreateSubstituteSession
-// Validates room availability, then saves a new PENDING substitute request.
+// Validates weekday alignment, room availability, then saves a new PENDING substitute request.
 // ─────────────────────────────────────────────
 
 func CreateSubstituteSession(input *SubstituteSessionInput) (SubstituteSessionResponse, error) {
@@ -185,37 +361,73 @@ func CreateSubstituteSession(input *SubstituteSessionInput) (SubstituteSessionRe
 		return SubstituteSessionResponse{}, fmt.Errorf("room with ID %s not found", input.IDRuangan)
 	}
 
-	// 3. Translate date + slot into concrete time.Time values
+	// 3. Validate substitute asdos pengganti exists (when provided)
+	if input.IDAsdosPengganti != nil && *input.IDAsdosPengganti != "" {
+		if err := db.First(&models.AsistenDosen{}, "id = ?", *input.IDAsdosPengganti).Error; err != nil {
+			return SubstituteSessionResponse{}, fmt.Errorf("asdos pengganti with ID %s not found", *input.IDAsdosPengganti)
+		}
+	} else {
+		// Normalise empty string pointer to nil
+		input.IDAsdosPengganti = nil
+	}
+
+	// 4. Parse original_date and validate weekday matches the regular session's weekday
+	originalDate, err := time.Parse("2006-01-02", input.OriginalDate)
+	if err != nil {
+		return SubstituteSessionResponse{}, fmt.Errorf("invalid original_date format, expected YYYY-MM-DD: %w", err)
+	}
+
+	regularWeekday := session.KelasMulai.In(wib).Weekday()
+	originalWeekday := originalDate.Weekday()
+	if originalWeekday != regularWeekday {
+		return SubstituteSessionResponse{}, fmt.Errorf(
+			"original_date weekday (%s) does not match the regular session weekday (%s)",
+			originalWeekday.String(), regularWeekday.String(),
+		)
+	}
+
+	// 5. Translate date + slot into concrete time.Time values
 	startTime, endTime, err := translateSubstituteSchedule(input.SubstituteDate, input.SlotOption)
 	if err != nil {
 		return SubstituteSessionResponse{}, err
 	}
 
-	// 4. Clash detection against JadwalUtama and other SubstituteSessions
+	// 6. Room clash detection against JadwalUtama and other SubstituteSessions
 	if err := checkSubstituteClash(input.IDRuangan, startTime, endTime, ""); err != nil {
 		return SubstituteSessionResponse{}, err
 	}
 
-	// 5. Parse substitute date (date-only, midnight WIB)
-	substituteDate, _ := time.ParseInLocation("2006-01-02", input.SubstituteDate, wib)
+	// 7. Asdos pengganti clash detection (if a replacement asdos was designated)
+	if input.IDAsdosPengganti != nil {
+		if err := checkSubstituteTeacherClash(*input.IDAsdosPengganti, startTime, endTime, ""); err != nil {
+			return SubstituteSessionResponse{}, err
+		}
+	}
 
-	// 6. Persist
+	// 8. Parse substitute date (date-only, midnight WIB)
+	substituteDate, _ := time.Parse("2006-01-02", input.SubstituteDate)
+
+	// 9. Persist
 	sub := models.SubstituteSession{
-		IDSession:     input.IDSession,
-		IDRuangan:     input.IDRuangan,
-		Reason:        input.Reason,
-		Status:        models.StatusPending,
-		SubstituteDate: substituteDate,
-		KelasMulai:    startTime,
-		KelasBerakhir: endTime,
+		IDSession:        input.IDSession,
+		IDRuangan:        input.IDRuangan,
+		IDAsdosPengganti: input.IDAsdosPengganti, // mapped from DTO field IDAsdosPengganti → model field IDAsdosPengganti
+		Reason:           input.Reason,
+		Status:           models.StatusPending,
+		SubstituteDate:   substituteDate,
+		OriginalDate:     originalDate,
+		KelasMulai:       startTime,
+		KelasBerakhir:    endTime,
 	}
 	if err := db.Create(&sub).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("failed to create substitute session: %w", err)
 	}
 
-	// 7. Reload with preloads for the response
+	// 10. Reload with full preloads for the response
 	if err := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").Preload("Ruangan").
+		Preload("Session.MataKuliah").
+		Preload("Ruangan").
+		Preload("AsdosPengganti").Preload("AsdosPengganti.User").
 		First(&sub, "id = ?", sub.ID).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("failed to reload substitute session: %w", err)
 	}
@@ -233,7 +445,9 @@ func GetAllSubstituteSessions(statusFilter string) ([]SubstituteSessionResponse,
 	var subs []models.SubstituteSession
 
 	query := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").Preload("Ruangan")
+		Preload("Session.MataKuliah").
+		Preload("Ruangan").
+		Preload("AsdosPengganti").Preload("AsdosPengganti.User")
 
 	if statusFilter != "" {
 		query = query.Where("status = ?", statusFilter)
@@ -251,6 +465,49 @@ func GetAllSubstituteSessions(statusFilter string) ([]SubstituteSessionResponse,
 }
 
 // ─────────────────────────────────────────────
+// Service: GetSubstituteSessionByID
+// ─────────────────────────────────────────────
+
+func GetSubstituteSessionByID(id string) (SubstituteSessionResponse, error) {
+	db := config.DB
+	var sub models.SubstituteSession
+
+	if err := db.Preload("Session").Preload("Session.Kelas").
+		Preload("Session.MataKuliah").
+		Preload("Ruangan").
+		Preload("AsdosPengganti").Preload("AsdosPengganti.User").
+		First(&sub, "id = ?", id).Error; err != nil {
+		return SubstituteSessionResponse{}, fmt.Errorf("substitute session not found: %w", err)
+	}
+
+	return buildSubstituteResponse(&sub), nil
+}
+
+// ─────────────────────────────────────────────
+// Service: DeleteSubstituteSession
+// Soft deletes a substitute session (only if status is PENDING).
+// ─────────────────────────────────────────────
+
+func DeleteSubstituteSession(id string) error {
+	db := config.DB
+	var sub models.SubstituteSession
+
+	if err := db.First(&sub, "id = ?", id).Error; err != nil {
+		return fmt.Errorf("substitute session not found: %w", err)
+	}
+
+	if sub.Status != models.StatusPending {
+		return fmt.Errorf("cannot delete substitute session with status %s, only PENDING is allowed", sub.Status)
+	}
+
+	if err := db.Delete(&sub).Error; err != nil {
+		return fmt.Errorf("failed to delete substitute session: %w", err)
+	}
+
+	return nil
+}
+
+// ─────────────────────────────────────────────
 // Service: UpdateSubstituteStatus
 // Coordinator approves (VERIFIED) or rejects (REJECTED) a pending request.
 // ─────────────────────────────────────────────
@@ -258,15 +515,14 @@ func GetAllSubstituteSessions(statusFilter string) ([]SubstituteSessionResponse,
 func UpdateSubstituteStatus(id string, input *UpdateSubstituteStatusInput) (SubstituteSessionResponse, error) {
 	db := config.DB
 
-	// Validate allowed transitions
+	// 1. Validate allowed transitions
 	if input.Status != models.StatusVerified && input.Status != models.StatusRejected {
 		return SubstituteSessionResponse{}, errors.New("status must be either 'VERIFIED' or 'REJECTED'")
 	}
 
+	// 2. Cek eksistensi dan status saat ini
 	var sub models.SubstituteSession
-	if err := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").Preload("Ruangan").
-		First(&sub, "id = ?", id).Error; err != nil {
+	if err := db.First(&sub, "id = ?", id).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("substitute session with ID %s not found", id)
 	}
 
@@ -276,16 +532,159 @@ func UpdateSubstituteStatus(id string, input *UpdateSubstituteStatusInput) (Subs
 		)
 	}
 
-	if err := db.Model(&sub).Update("status", input.Status).Error; err != nil {
+	// 3. THE FIX: Update HANYA kolom status dengan model kosong (mencegah GORM update relasi)
+	if err := db.Model(&models.SubstituteSession{}).Where("id = ?", id).Update("status", input.Status).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("failed to update substitute session status: %w", err)
 	}
 
-	// Reload to reflect updated_at
+	// 4. Reload data secara utuh beserta relasinya untuk response JSON
 	if err := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").Preload("Ruangan").
+		Preload("Session.MataKuliah").
+		Preload("Ruangan").
+		Preload("AsdosPengganti").Preload("AsdosPengganti.User").
 		First(&sub, "id = ?", id).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("failed to reload substitute session after update: %w", err)
 	}
 
 	return buildSubstituteResponse(&sub), nil
 }
+
+// ─────────────────────────────────────────────
+// Service: GetTimelineJadwal (Proyeksi Kalender Pintar)
+//
+// Mengelompokkan hasil akhir berdasarkan list harian yang diurutkan
+// berdasarkan tanggal dan jam mulai kelas.
+// ─────────────────────────────────────────────
+
+func GetTimelineJadwal(startDateStr, endDateStr, idSemester, asdosID string) ([]UnifiedJadwalResponse, error) {
+	db := config.DB
+
+	// 1. Parse Range: Generate list semua tanggal (tipe time.Time) dari start_date sampai end_date
+	startDate, err := time.ParseInLocation("2006-01-02", startDateStr, wib)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start_date format: %w", err)
+	}
+	endDate, err := time.ParseInLocation("2006-01-02", endDateStr, wib)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end_date format: %w", err)
+	}
+	if endDate.Before(startDate) {
+		return nil, errors.New("end_date must be greater than or equal to start_date")
+	}
+	if idSemester == "" {
+		return nil, errors.New("id_semester is required")
+	}
+
+	// 2. Query Data Reguler: Tarik semua JadwalUtama berdasarkan id_semester
+	//    Jika asdosID tidak kosong, filter id_asdos1 = asdosID OR id_asdos2 = asdosID.
+	var regularSessions []models.JadwalUtama
+	regularQuery := db.
+		Preload("Kelas").
+		Preload("MataKuliah").
+		Preload("Ruangan").
+		Preload("Dosen").
+		Preload("Asdos1").Preload("Asdos1.User").
+		Preload("Asdos2").Preload("Asdos2.User").
+		Where("id_semester = ?", idSemester)
+	if asdosID != "" {
+		regularQuery = regularQuery.Where("id_asdos1 = ? OR id_asdos2 = ?", asdosID, asdosID)
+	}
+	if err := regularQuery.Find(&regularSessions).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch regular sessions: %w", err)
+	}
+
+	// 3. Query Data Pengganti: Tarik semua SubstituteSession yang statusnya VERIFIED
+	//    dan bersinggungan dengan range tanggal tersebut.
+	var substituteSessions []models.SubstituteSession
+	substituteQuery := db.
+		Preload("Session").
+		Preload("Session.Kelas").
+		Preload("Session.MataKuliah").
+		Preload("Session.Dosen").
+		Preload("Session.Asdos1").Preload("Session.Asdos1.User").
+		Preload("Session.Asdos2").Preload("Session.Asdos2.User").
+		Preload("Ruangan").
+		Preload("AsdosPengganti").Preload("AsdosPengganti.User").
+		Where("status = ?", models.StatusVerified).
+		Where("substitute_date::date >= ? AND substitute_date::date <= ?",
+			startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+
+	if asdosID != "" {
+		// Logika Asdos: asdos_pengganti = asdosID OR (asdos_pengganti IS NULL AND (session.id_asdos1 = asdosID OR session.id_asdos2 = asdosID))
+		substituteQuery = substituteQuery.Joins("JOIN jadwal_utamas ju ON ju.id = substitute_sessions.id_session").
+			Where(
+				"substitute_sessions.id_asdos_pengganti = ? OR "+
+					"(substitute_sessions.id_asdos_pengganti IS NULL AND (ju.id_asdos1 = ? OR ju.id_asdos2 = ?))",
+				asdosID, asdosID, asdosID,
+			)
+	}
+	if err := substituteQuery.Find(&substituteSessions).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch substitute sessions: %w", err)
+	}
+
+	// 4. Logika Blacklist (Tanggal Batal): Buat Hash Map map[string]bool
+	//    Format key: YYYY-MM-DD_IDSession.
+	blacklist := make(map[string]bool, len(substituteSessions))
+	for i := range substituteSessions {
+		sub := &substituteSessions[i]
+		key := sub.OriginalDate.In(wib).Format("2006-01-02") + "_" + sub.IDSession
+		blacklist[key] = true
+	}
+
+	results := make([]UnifiedJadwalResponse, 0)
+
+	// 5. Logika Projection (Looping Harian):
+	for day := startDate; !day.After(endDate); day = day.AddDate(0, 0, 1) {
+		dayWeekday := day.Weekday()
+		dateStr := day.Format("2006-01-02")
+
+		// A. Render Reguler: Cek semua JadwalUtama
+		for i := range regularSessions {
+			sess := &regularSessions[i]
+			// Jika weekday jadwal reguler SAMA dengan weekday tanggal iterasi saat ini:
+			if sess.KelasMulai.In(wib).Weekday() != dayWeekday {
+				continue
+			}
+
+			// Cek Blacklist: Jika kombinasi Tanggal Iterasi + ID JadwalUtama ADA di Hash Map
+			blacklistKey := dateStr + "_" + sess.ID
+			if blacklist[blacklistKey] {
+				// SKIP jadwal ini (karena hari itu libur/dipindah)
+				continue
+			}
+
+			// Jika TIDAK ADA di Blacklist, masukkan ke response dengan tipe "REGULAR"
+			unified := buildUnifiedFromRegular(sess, day)
+			unified.Tipe = "REGULAR" // memastikan format tepat sesuai req
+			results = append(results, unified)
+		}
+
+		// B. Render Pengganti: Cek semua SubstituteSession
+		for i := range substituteSessions {
+			sub := &substituteSessions[i]
+			// Jika SubstituteDate SAMA dengan tanggal iterasi saat ini
+			if sub.SubstituteDate.In(wib).Format("2006-01-02") == dateStr {
+				// Masukkan ke response dengan tipe "SUBSTITUTE".
+				// (Fungsi buildUnifiedFromSubstitute sudah menangani logic AsdosPengganti)
+				unified := buildUnifiedFromSubstitute(sub)
+				unified.Tipe = "SUBSTITUTE"
+				results = append(results, unified)
+			}
+		}
+	}
+
+	// 6. Kelompokkan hasil akhir (List harian diurutkan berdasarkan jam mulai kelas)
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Tanggal != results[j].Tanggal {
+			return results[i].Tanggal < results[j].Tanggal
+		}
+		return results[i].Waktu < results[j].Waktu
+	})
+
+	return results, nil
+}
+
+// ─────────────────────────────────────────────
+// Service: GetDailyAsdosSessions
+// Daily view for an Asdos for a specific date (combining regular & substitute).
+// ─────────────────────────────────────────────
