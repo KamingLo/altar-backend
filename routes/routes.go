@@ -20,6 +20,7 @@ func SetupRouter() *gin.Engine {
 	ClassRoutes(r)
 	LecturerRoutes(r)
 	SessionRoutes(r)
+	SubstituteSessionRoutes(r)
 
 	return r
 }

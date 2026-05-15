@@ -17,3 +17,4 @@ func AsdosRoutes(r *gin.Engine) {
 		asdos.DELETE("/:id", controllers.DeleteAsdos)
 	}
 }
+

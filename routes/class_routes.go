@@ -8,6 +8,7 @@ import (
 
 func ClassRoutes(r *gin.Engine) {
 	class := r.Group("/classes")
+	class.Use(AuthMiddleware(), IsKoordinatorMiddleware())
 	{
 		class.POST("/", controllers.CreateClass)
 		class.GET("/", controllers.GetAllClasses)
@@ -16,3 +17,4 @@ func ClassRoutes(r *gin.Engine) {
 		class.DELETE("/:id", controllers.DeleteClass)
 	}
 }
+
