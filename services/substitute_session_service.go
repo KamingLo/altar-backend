@@ -28,7 +28,8 @@ type SubstituteSessionInput struct {
 // ─────────────────────────────────────────────
 
 type UpdateSubstituteStatusInput struct {
-	Status models.SubstituteSessionStatus `json:"status"`
+	Status            models.SubstituteSessionStatus `json:"status"`
+	CoordinatorReason *string                        `json:"coordinator_reason"`
 }
 
 // ─────────────────────────────────────────────
@@ -39,6 +40,7 @@ type SubstituteSessionResponse struct {
 	ID                string                         `json:"id"`
 	Status            models.SubstituteSessionStatus `json:"status"`
 	Reason            string                         `json:"reason"`
+	CoordinatorReason *string                        `json:"coordinator_reason"`
 	SubstituteDate    string                         `json:"substitute_date"`    // YYYY-MM-DD
 	OriginalDate      string                         `json:"original_date"`      // YYYY-MM-DD
 	TimeSlot          string                         `json:"time_slot"`          // "HH:mm – HH:mm"
@@ -235,6 +237,7 @@ func buildSubstituteResponse(sub *models.SubstituteSession) SubstituteSessionRes
 		ID:                sub.ID,
 		Status:            sub.Status,
 		Reason:            sub.Reason,
+		CoordinatorReason: sub.CoordinatorReason,
 		SubstituteDate:    dateStr,
 		OriginalDate:      originalDateStr,
 		TimeSlot:          timeSlot,
@@ -532,8 +535,15 @@ func UpdateSubstituteStatus(id string, input *UpdateSubstituteStatusInput) (Subs
 		)
 	}
 
-	// 3. THE FIX: Update HANYA kolom status dengan model kosong (mencegah GORM update relasi)
-	if err := db.Model(&models.SubstituteSession{}).Where("id = ?", id).Update("status", input.Status).Error; err != nil {
+	// 3. THE FIX: Update status dan optional coordinator_reason menggunakan map (mencegah GORM update relasi)
+	updates := map[string]interface{}{
+		"status": input.Status,
+	}
+	if input.CoordinatorReason != nil {
+		updates["coordinator_reason"] = *input.CoordinatorReason
+	}
+
+	if err := db.Model(&models.SubstituteSession{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("failed to update substitute session status: %w", err)
 	}
 

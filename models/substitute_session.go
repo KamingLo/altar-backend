@@ -29,6 +29,7 @@ type SubstituteSession struct {
 	IDRuangan            string                  `gorm:"type:varchar(36);not null"                json:"id_ruangan"`
 	IDAsdosPengganti     *string                 `gorm:"type:varchar(36)"                         json:"id_asdos_pengganti"` // nullable — nil means the original teacher handles the session themselves
 	Reason               string                  `gorm:"type:text;not null"                       json:"reason"`
+	CoordinatorReason    *string                 `gorm:"type:text"                                json:"coordinator_reason"` // nullable — the coordinator's note on approval/rejection
 	Status               SubstituteSessionStatus `gorm:"type:varchar(20);not null;default:'PENDING'" json:"status"`
 	SubstituteDate       time.Time               `gorm:"not null"                                 json:"substitute_date"`  // actual replacement date (YYYY-MM-DD)
 	OriginalDate         time.Time               `gorm:"not null;type:date"                       json:"original_date"`    // cancelled regular schedule date (YYYY-MM-DD)

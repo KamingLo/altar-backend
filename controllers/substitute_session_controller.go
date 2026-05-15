@@ -30,7 +30,8 @@ type CreateSubstituteSessionRequest struct {
 // ─────────────────────────────────────────────
 
 type UpdateSubstituteStatusRequest struct {
-	Status string `json:"status" binding:"required"`
+	Status            string  `json:"status" binding:"required"`
+	CoordinatorReason *string `json:"coordinator_reason"`
 }
 
 // ─────────────────────────────────────────────
@@ -132,7 +133,8 @@ func UpdateSubstituteStatus(c *gin.Context) {
 	}
 
 	input := &services.UpdateSubstituteStatusInput{
-		Status: models.SubstituteSessionStatus(req.Status),
+		Status:            models.SubstituteSessionStatus(req.Status),
+		CoordinatorReason: req.CoordinatorReason,
 	}
 
 	resp, err := services.UpdateSubstituteStatus(id, input)
