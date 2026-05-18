@@ -7,20 +7,28 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	// r.Use(CORSMiddleware())
-	// r.Use(RateLimitMiddleware())
+	r.Use(CORSMiddleware())
+	r.Use(RateLimitMiddleware())
 
+	// Public and self-managed Auth routes
 	AuthRoutes(r)
-	UserRoutes(r)
-	AsdosRoutes(r)
-	KoorRoutes(r)
-	RoomRoutes(r)
-	CourseRoutes(r)
-	SemesterRoutes(r)
-	ClassRoutes(r)
-	LecturerRoutes(r)
-	SessionRoutes(r)
-	SubstituteSessionRoutes(r)
+
+	// Protected routes group
+	api := r.Group("/")
+	api.Use(AuthMiddleware(), KioskBlockerMiddleware())
+	{
+		UserRoutes(api)
+		AsdosRoutes(api)
+		KoorRoutes(api)
+		RoomRoutes(api)
+		CourseRoutes(api)
+		SemesterRoutes(api)
+		ClassRoutes(api)
+		LecturerRoutes(api)
+		SessionRoutes(api)
+		SubstituteSessionRoutes(api)
+		PresensiRoutes(api)
+	}
 
 	return r
 }

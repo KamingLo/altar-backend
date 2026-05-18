@@ -6,10 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func LecturerRoutes(r *gin.Engine) {
+func LecturerRoutes(r *gin.RouterGroup) {
 	lecturer := r.Group("/lecturers")
 	lecturer.GET("/", controllers.GetAllLecturers)
-	lecturer.Use(AuthMiddleware(), IsKoordinatorMiddleware())
+	lecturer.Use(IsKoordinatorMiddleware())
 	{
 		lecturer.POST("/", controllers.CreateLecturer)
 		lecturer.GET("/:id", controllers.GetLecturerByID)

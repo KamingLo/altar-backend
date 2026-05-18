@@ -7,21 +7,21 @@ import (
 )
 
 
-func SessionRoutes(r *gin.Engine) {
+func SessionRoutes(r *gin.RouterGroup) {
 	session := r.Group("/sessions")
 
 	// Global / Open routes
 	session.GET("/", controllers.GetAllSessions)
 
 	// Asdos specific routes
-	session.GET("/me", AuthMiddleware(), IsAsdosMiddleware(), controllers.GetMySession)
+	session.GET("/me", IsAsdosMiddleware(), controllers.GetMySession)
 
 	// Detail route (put after static routes)
 	// session.GET("/:id", controllers.GetSessionByID)
 
 	// Koordinator routes
 	koor := session.Group("/")
-	koor.Use(AuthMiddleware(), IsKoordinatorMiddleware())
+	koor.Use(IsKoordinatorMiddleware())
 	{
 		koor.POST("/", controllers.CreateSession)
 		koor.PATCH("/:id", controllers.UpdateSession)

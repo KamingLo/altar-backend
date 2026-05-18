@@ -42,7 +42,7 @@ func LoginUser(input models.UserLogin) (string, error) {
 	idAsisten := CekAsdos(user.ID)
 	idKoordinator := CekKoordinator(user.ID)
 
-	return utils.GenerateToken(user.ID, user.Email, idAsisten, idKoordinator)
+	return utils.GenerateToken(user.ID, user.Email, idAsisten, idKoordinator, false)
 }
 
 func HandleGoogleLogin(email string) (string, error) {
@@ -55,7 +55,7 @@ func HandleGoogleLogin(email string) (string, error) {
 	idAsisten := CekAsdos(user.ID)
 	idKoordinator := CekKoordinator(user.ID)
 
-	return utils.GenerateToken(user.ID, user.Email, idAsisten, idKoordinator)
+	return utils.GenerateToken(user.ID, user.Email, idAsisten, idKoordinator, false)
 }
 
 func ForgotPassword(email string) error {

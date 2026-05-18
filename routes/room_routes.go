@@ -6,10 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RoomRoutes(r *gin.Engine) {
+func RoomRoutes(r *gin.RouterGroup) {
 	room := r.Group("/rooms")
 	room.GET("/", controllers.GetAllRooms)
-	room.Use(AuthMiddleware(), IsKoordinatorMiddleware())
+	room.Use(IsKoordinatorMiddleware())
 	{
 		room.POST("/", controllers.CreateRoom)
 		room.GET("/:id", controllers.GetRoomByID)

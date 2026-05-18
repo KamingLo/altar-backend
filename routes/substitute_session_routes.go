@@ -6,9 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SubstituteSessionRoutes(r *gin.Engine) {
+func SubstituteSessionRoutes(r *gin.RouterGroup) {
 	sub := r.Group("/substitute-sessions")
-	sub.Use(AuthMiddleware())
 	{
 		// Asdos: submit a new substitute session request
 		sub.POST("/", controllers.CreateSubstituteSession)
@@ -22,7 +21,6 @@ func SubstituteSessionRoutes(r *gin.Engine) {
 
 	// Jadwal (schedule) endpoints — all require authentication
 	jadwal := r.Group("/jadwal")
-	jadwal.Use(AuthMiddleware())
 	{
 		// Global view: all sessions for a semester (any authenticated user)
 		jadwal.GET("/sessions", controllers.GetScheduleTimeline)

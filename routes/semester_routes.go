@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SemesterRoutes(r *gin.Engine) {
+func SemesterRoutes(r *gin.RouterGroup) {
 	semester := r.Group("/semesters")
 	{
 		semester.POST("/", controllers.CreateSemester)

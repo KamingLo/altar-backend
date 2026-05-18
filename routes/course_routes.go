@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CourseRoutes(r *gin.Engine) {
+func CourseRoutes(r *gin.RouterGroup) {
 	course := r.Group("/courses")
-	course.Use(AuthMiddleware(), IsKoordinatorMiddleware())
+	course.Use(IsKoordinatorMiddleware())
 	{
 		course.POST("/", controllers.CreateCourse)
 		course.GET("/", controllers.GetAllCourses)

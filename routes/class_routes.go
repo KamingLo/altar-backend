@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func ClassRoutes(r *gin.Engine) {
+func ClassRoutes(r *gin.RouterGroup) {
 	class := r.Group("/classes")
-	class.Use(AuthMiddleware(), IsKoordinatorMiddleware())
+	class.Use(IsKoordinatorMiddleware())
 	{
 		class.POST("/", controllers.CreateClass)
 		class.GET("/", controllers.GetAllClasses)
