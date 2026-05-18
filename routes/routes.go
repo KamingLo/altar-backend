@@ -14,6 +14,15 @@ func SetupRouter() *gin.Engine {
 	UserRoutes(r)
 	AsdosRoutes(r)
 	KoorRoutes(r)
+	RoomRoutes(r)
+	CourseRoutes(r)
+	SemesterRoutes(r)
+	ClassRoutes(r)
+	LecturerRoutes(r)
+	SessionRoutes(r)
+	SubstituteSessionRoutes(r)
 
 	return r
 }
+
+
