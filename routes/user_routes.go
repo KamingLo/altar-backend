@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func UserRoutes(r *gin.Engine) {
+func UserRoutes(r *gin.RouterGroup) {
 	user := r.Group("/users")
-	user.Use(AuthMiddleware(), IsKoordinatorMiddleware())
+	user.Use(IsKoordinatorMiddleware())
 	{
 		user.POST("/", controllers.CreateUser)
 		user.GET("/", controllers.GetAllUsers)

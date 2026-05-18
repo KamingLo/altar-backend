@@ -15,6 +15,7 @@ type Koordinator struct {
 
 	UserID string `gorm:"type:varchar(36)" json:"user_id"`
 	NIP    string `gorm:"column:nip" json:"nip"`
+	KioskPIN *string `gorm:"type:varchar(255);nullable" json:"-"`
 
 	User User `gorm:"foreignKey:UserID" json:"user"`
 }

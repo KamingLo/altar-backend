@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func GenerateToken(userID string, email string, idAsisten, idKoordinator *string) (string, error) {
+func GenerateToken(userID string, email string, idAsisten, idKoordinator *string, isKioskMode bool) (string, error) {
 	secretKey := []byte(os.Getenv("JWT_SECRET"))
 
 	isExpires := os.Getenv("JWT_EXPIRES")
@@ -20,6 +20,7 @@ func GenerateToken(userID string, email string, idAsisten, idKoordinator *string
 		"email":         email,
 		"id_asisten":    idAsisten,
 		"id_koordinator": idKoordinator,
+		"is_kiosk_mode": isKioskMode,
 		"iat":           time.Now().Unix(),
 	}
 
@@ -31,6 +32,19 @@ func GenerateToken(userID string, email string, idAsisten, idKoordinator *string
 		}
 
 		claims["exp"] = time.Now().Add(time.Hour * time.Duration(hours)).Unix()
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(secretKey)
+}
+
+func GenerateQRToken(coordinatorID string) (string, error) {
+	secretKey := []byte(os.Getenv("JWT_SECRET"))
+
+	claims := jwt.MapClaims{
+		"coordinator_id": coordinatorID,
+		"iat":            time.Now().Unix(),
+		"exp":            time.Now().Add(time.Minute * 5).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

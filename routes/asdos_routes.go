@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AsdosRoutes(r *gin.Engine) {
+func AsdosRoutes(r *gin.RouterGroup) {
 	asdos := r.Group("/asdos")
-	asdos.Use(AuthMiddleware(), IsKoordinatorMiddleware())
+	asdos.Use(IsKoordinatorMiddleware())
 	{
 		asdos.POST("/", controllers.CreateAsdos)
 		asdos.GET("/", controllers.GetAllAsdos)
@@ -17,3 +17,4 @@ func AsdosRoutes(r *gin.Engine) {
 		asdos.DELETE("/:id", controllers.DeleteAsdos)
 	}
 }
+
