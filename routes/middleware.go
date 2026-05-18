@@ -93,6 +93,26 @@ func IsKoordinatorMiddleware() gin.HandlerFunc {
 	}
 }
 
+func IsKioskMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, exists := c.Get("jwt_claims")
+		if !exists {
+			utils.SendError(c, http.StatusForbidden, "Access denied: Kiosk session required", nil)
+			c.Abort()
+			return
+		}
+
+		mapClaims := claims.(jwt.MapClaims)
+		isKiosk, ok := mapClaims["is_kiosk_mode"].(bool)
+		if !ok || !isKiosk {
+			utils.SendError(c, http.StatusForbidden, "Access denied: Device is not in Kiosk Mode", nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // KioskBlockerMiddleware restricts access to regular APIs when Kiosk Mode is enabled.
 func KioskBlockerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -38,6 +38,18 @@ func CheckIn(asdosID string, input models.Presensi) (models.Presensi, error) {
 		return models.Presensi{}, err
 	}
 
+	// Reload with preloads
+	config.DB.
+		Preload("JadwalUtama.MataKuliah").
+		Preload("JadwalUtama.Kelas").
+		Preload("JadwalUtama.Ruangan").
+		Preload("SubstituteSession.Session.MataKuliah").
+		Preload("SubstituteSession.Session.Kelas").
+		Preload("SubstituteSession.Ruangan").
+		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan.User").
+		First(&input, "id_presensi = ?", input.IDPresensi)
+
 	return input, nil
 }
 
@@ -63,6 +75,18 @@ func CheckOut(asdosID string, presensiID string, deskripsi string) (models.Prese
 		return models.Presensi{}, err
 	}
 
+	// Reload with preloads
+	config.DB.
+		Preload("JadwalUtama.MataKuliah").
+		Preload("JadwalUtama.Kelas").
+		Preload("JadwalUtama.Ruangan").
+		Preload("SubstituteSession.Session.MataKuliah").
+		Preload("SubstituteSession.Session.Kelas").
+		Preload("SubstituteSession.Ruangan").
+		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan.User").
+		First(&presensi, "id_presensi = ?", presensi.IDPresensi)
+
 	return presensi, nil
 }
 
@@ -78,12 +102,32 @@ func EveningAttendance(asdosID string, input models.Presensi, startTime, endTime
 		return models.Presensi{}, err
 	}
 
+	// Reload with preloads
+	config.DB.
+		Preload("JadwalUtama.MataKuliah").
+		Preload("JadwalUtama.Kelas").
+		Preload("JadwalUtama.Ruangan").
+		Preload("SubstituteSession.Session.MataKuliah").
+		Preload("SubstituteSession.Session.Kelas").
+		Preload("SubstituteSession.Ruangan").
+		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan.User").
+		First(&input, "id_presensi = ?", input.IDPresensi)
+
 	return input, nil
 }
 
 func GetAllPresensi(isVerified *bool, tipe *string) ([]models.Presensi, error) {
 	var presensi []models.Presensi
-	query := config.DB.Preload("JadwalUtama").Preload("AsdosPelaksana").Preload("AsdosRekan")
+	query := config.DB.
+		Preload("JadwalUtama.MataKuliah").
+		Preload("JadwalUtama.Kelas").
+		Preload("JadwalUtama.Ruangan").
+		Preload("SubstituteSession.Session.MataKuliah").
+		Preload("SubstituteSession.Session.Kelas").
+		Preload("SubstituteSession.Ruangan").
+		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan.User")
 
 	if isVerified != nil {
 		query = query.Where("is_verified = ?", *isVerified)
@@ -96,6 +140,24 @@ func GetAllPresensi(isVerified *bool, tipe *string) ([]models.Presensi, error) {
 		return nil, err
 	}
 	return presensi, nil
+}
+
+func GetAllMyPresensi(asdosID string) ([]models.Presensi, error) {
+	var presensi []models.Presensi
+	err := config.DB.
+		Preload("JadwalUtama.MataKuliah").
+		Preload("JadwalUtama.Kelas").
+		Preload("JadwalUtama.Ruangan").
+		Preload("SubstituteSession.Session.MataKuliah").
+		Preload("SubstituteSession.Session.Kelas").
+		Preload("SubstituteSession.Ruangan").
+		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan.User").
+		Where("id_asdos_pelaksana = ? OR id_asdos_rekan = ?", asdosID, asdosID).
+		Order("waktu_check_in DESC").
+		Find(&presensi).Error
+
+	return presensi, err
 }
 
 func VerifyPresensi(id string, verified bool) error {

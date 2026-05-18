@@ -20,6 +20,6 @@ func KoorRoutes(r *gin.RouterGroup) {
 		koor.POST("/kiosk/pin", controllers.SetKioskPIN)
 		koor.POST("/kiosk/verify", controllers.VerifyKioskPIN)
 		koor.POST("/kiosk/deactivate", controllers.DeactivateKiosk)
-		koor.GET("/kiosk/generate-qr", controllers.GenerateQR)
+		koor.GET("/kiosk/generate-qr", IsKioskMiddleware(), controllers.GenerateQR)
 	}
 }

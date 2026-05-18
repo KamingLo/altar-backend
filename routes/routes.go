@@ -7,8 +7,8 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	r.Use(CORSMiddleware())
-	r.Use(RateLimitMiddleware())
+	// r.Use(CORSMiddleware())
+	// r.Use(RateLimitMiddleware())
 
 	// Public and self-managed Auth routes
 	AuthRoutes(r)
@@ -32,5 +32,3 @@ func SetupRouter() *gin.Engine {
 
 	return r
 }
-
-

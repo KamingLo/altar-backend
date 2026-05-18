@@ -13,6 +13,7 @@ func PresensiRoutes(r *gin.RouterGroup) {
 		asdos := presensi.Group("/")
 		asdos.Use(IsAsdosMiddleware())
 		{
+			asdos.GET("/me", controllers.GetAllMyPresensi)
 			asdos.POST("/check-in", controllers.CheckIn)
 			asdos.POST("/check-out", controllers.CheckOut)
 			asdos.POST("/evening", controllers.EveningAttendance)
