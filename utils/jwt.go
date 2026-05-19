@@ -16,12 +16,12 @@ func GenerateToken(userID string, email string, idAsisten, idKoordinator *string
 	expiresInStr := os.Getenv("JWT_EXPIRES_IN")
 
 	claims := jwt.MapClaims{
-		"user_id":       userID,
-		"email":         email,
-		"id_asisten":    idAsisten,
+		"user_id":        userID,
+		"email":          email,
+		"id_asisten":     idAsisten,
 		"id_koordinator": idKoordinator,
-		"is_kiosk_mode": isKioskMode,
-		"iat":           time.Now().Unix(),
+		"is_kiosk_mode":  isKioskMode,
+		"iat":            time.Now().Unix(),
 	}
 
 	if isExpires == "enable" {
@@ -60,7 +60,7 @@ func ValidateToken(tokenString string, secret string) (jwt.MapClaims, error) {
 	})
 
 	if err != nil || !token.Valid {
-		return nil, errors.New("invalid token")
+		return nil, errors.New("invalid token" + err.Error())
 	}
 
 	return token.Claims.(jwt.MapClaims), nil
