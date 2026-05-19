@@ -32,6 +32,7 @@ type EveningAttendanceRequest struct {
 	WaktuMulai      string  `json:"waktu_mulai" binding:"required"`   // Format "15:04"
 	WaktuSelesai    string  `json:"waktu_selesai" binding:"required"` // Format "15:04"
 	DeskripsiMateri string  `json:"deskripsi_materi" binding:"required"`
+	LinkVideo       string  `json:"link_video" binding:"required"`
 }
 
 type PresensiResponseDTO struct {
@@ -186,6 +187,7 @@ func EveningAttendance(c *gin.Context) {
 		IDAsdosRekan:    req.IDAsdosRekan,
 		Menggantikan:    req.Menggantikan,
 		DeskripsiMateri: &req.DeskripsiMateri,
+		LinkVideo:       &req.LinkVideo,
 	}
 
 	res, err := services.EveningAttendance(asdosID, presensi, waktuMulai, waktuSelesai)
