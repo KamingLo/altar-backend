@@ -11,6 +11,7 @@ import (
 	"altar/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/time/rate"
 )
 
@@ -63,6 +64,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("user_email", claims["email"])
 		c.Set("id_asisten", claims["id_asisten"])
 		c.Set("id_koordinator", claims["id_koordinator"])
+		c.Set("jwt_claims", claims)
 		c.Next()
 	}
 }
@@ -87,6 +89,67 @@ func IsKoordinatorMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		c.Next()
+	}
+}
+
+func IsKioskMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, exists := c.Get("jwt_claims")
+		if !exists {
+			utils.SendError(c, http.StatusForbidden, "Access denied: Kiosk session required", nil)
+			c.Abort()
+			return
+		}
+
+		mapClaims := claims.(jwt.MapClaims)
+		isKiosk, ok := mapClaims["is_kiosk_mode"].(bool)
+		if !ok || !isKiosk {
+			utils.SendError(c, http.StatusForbidden, "Access denied: Device is not in Kiosk Mode", nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// KioskBlockerMiddleware restricts access to regular APIs when Kiosk Mode is enabled.
+func KioskBlockerMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, exists := c.Get("jwt_claims")
+		if !exists {
+			// Fallback: extract from context if AuthMiddleware didn't set claims
+			// but AuthMiddleware should have set it. Let's ensure AuthMiddleware sets it.
+			c.Next()
+			return
+		}
+
+		mapClaims := claims.(jwt.MapClaims)
+		isKiosk, ok := mapClaims["is_kiosk_mode"].(bool)
+		if ok && isKiosk {
+			// List of allowed paths in Kiosk Mode
+			allowedPaths := []string{
+				"/koor/kiosk/generate-qr",
+				"/koor/kiosk/verify", // to deactivate kiosk mode
+				"/koor/kiosk/deactivate",
+			}
+
+			currPath := c.Request.URL.Path
+			isAllowed := false
+			for _, p := range allowedPaths {
+				if strings.HasPrefix(currPath, p) {
+					isAllowed = true
+					break
+				}
+			}
+
+			if !isAllowed {
+				utils.SendError(c, http.StatusForbidden, "Kiosk Mode Active: Access to this resource is locked", nil)
+				c.Abort()
+				return
+			}
+		}
+
 		c.Next()
 	}
 }

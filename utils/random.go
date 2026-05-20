@@ -22,3 +22,14 @@ func GenerateCustomID(prefix string, length int) string {
 
 	return fmt.Sprintf("%s-%s-%s-%s", prefix, datePart, machine_id, string(result))
 }
+
+func GenerateRandomPassword(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		randomByte := make([]byte, 1)
+		rand.Read(randomByte)
+		result[i] = charset[randomByte[0]%uint8(len(charset))]
+	}
+	return string(result)
+}

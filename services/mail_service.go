@@ -20,6 +20,10 @@ type DataResetPassword struct {
 	ResetURL string
 }
 
+type DataNewAccount struct {
+	Password string
+}
+
 // SendEmail handles the low-level SMTP connection and delivery
 func SendEmail(toEmail, subject, body string) error {
 	host := os.Getenv("MAIL_HOST")
@@ -98,6 +102,38 @@ func SendForgotPasswordLink(toEmail, resetURL string) error {
 	}
 
 	// Kirim secara asinkron agar API tetap responsif (Non-blocking)
+	go func(targetEmail, mailSubject, mailBody string) {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Printf("[Panic Recovery] Error sending email to %s: %v\n", targetEmail, r)
+			}
+		}()
+
+		err := SendEmail(targetEmail, mailSubject, mailBody)
+		if err != nil {
+			fmt.Printf("[Background Error] Failed to send email to %s: %v\n", targetEmail, err)
+		}
+	}(toEmail, subject, body.String())
+
+	return nil
+}
+
+func SendNewAccountPassword(toEmail, password string) error {
+	subject := "Selamat Datang - Password Akun Baru Anda"
+
+	tmplPath := filepath.Join("templates", "new_account_password.html")
+	tmpl, err := template.ParseFiles(tmplPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var body bytes.Buffer
+	data := DataNewAccount{Password: password}
+	if err := tmpl.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	// Send email asynchronously
 	go func(targetEmail, mailSubject, mailBody string) {
 		defer func() {
 			if r := recover(); r != nil {

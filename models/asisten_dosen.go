@@ -24,7 +24,7 @@ func init() {
 	RegisterModel(&AsistenDosen{})
 }
 
-func (a *AsistenDosen) BeforeCreate(tx *gorm.DB) (err error) {
-	a.ID = utils.GenerateCustomID("asd", 6)
+func (o *AsistenDosen) BeforeCreate(tx *gorm.DB) (err error) {
+	o.ID = utils.GenerateCustomID("asdos", 6)
 	return nil
 }

@@ -9,18 +9,19 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func GenerateToken(userID string, email string, idAsisten, idKoordinator *string) (string, error) {
+func GenerateToken(userID string, email string, idAsisten, idKoordinator *string, isKioskMode bool) (string, error) {
 	secretKey := []byte(os.Getenv("JWT_SECRET"))
 
 	isExpires := os.Getenv("JWT_EXPIRES")
 	expiresInStr := os.Getenv("JWT_EXPIRES_IN")
 
 	claims := jwt.MapClaims{
-		"user_id":       userID,
-		"email":         email,
-		"id_asisten":    idAsisten,
+		"user_id":        userID,
+		"email":          email,
+		"id_asisten":     idAsisten,
 		"id_koordinator": idKoordinator,
-		"iat":           time.Now().Unix(),
+		"is_kiosk_mode":  isKioskMode,
+		"iat":            time.Now().Unix(),
 	}
 
 	if isExpires == "enable" {
@@ -37,6 +38,19 @@ func GenerateToken(userID string, email string, idAsisten, idKoordinator *string
 	return token.SignedString(secretKey)
 }
 
+func GenerateQRToken(coordinatorID string) (string, error) {
+	secretKey := []byte(os.Getenv("JWT_SECRET"))
+
+	claims := jwt.MapClaims{
+		"coordinator_id": coordinatorID,
+		"iat":            time.Now().Unix(),
+		"exp":            time.Now().Add(time.Minute * 5).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(secretKey)
+}
+
 func ValidateToken(tokenString string, secret string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -46,7 +60,7 @@ func ValidateToken(tokenString string, secret string) (jwt.MapClaims, error) {
 	})
 
 	if err != nil || !token.Valid {
-		return nil, errors.New("invalid token")
+		return nil, errors.New("invalid token" + err.Error())
 	}
 
 	return token.Claims.(jwt.MapClaims), nil
