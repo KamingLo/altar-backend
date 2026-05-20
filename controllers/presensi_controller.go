@@ -24,7 +24,7 @@ type CheckOutRequest struct {
 	QRToken         string `json:"qr_token" binding:"required"`
 }
 
-type EveningAttendanceRequest struct {
+type OnlineAttendanceRequest struct {
 	IDSesi          string  `json:"id_sesi" binding:"required"`
 	IDSesiPengganti *string `json:"id_sesi_pengganti"`
 	IDAsdosRekan    *string `json:"id_asdos_rekan"`
@@ -89,15 +89,6 @@ func mapToPresensiDTO(p models.Presensi) PresensiResponseDTO {
 }
 
 func CheckIn(c *gin.Context) {
-	// Validate Time Window (Morning: 07:30 - 17:10)
-	// now := time.Now()
-	// start := time.Date(now.Year(), now.Month(), now.Day(), 7, 30, 0, 0, now.Location())
-	// end := time.Date(now.Year(), now.Month(), now.Day(), 17, 10, 0, 0, now.Location())
-
-	// // if now.Before(start) || now.After(end) {
-	// // 	utils.SendError(c, http.StatusForbidden, "Morning attendance is only available between 07:30 and 17:10", nil)
-	// // 	return
-	// // }
 
 	var req CheckInRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -151,18 +142,10 @@ func CheckOut(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Check-out successful", mapToPresensiDTO(res))
 }
 
-func EveningAttendance(c *gin.Context) {
-	// Validate Time Window (Evening: 17:45 - 21:00)
+func OnlineAttendance(c *gin.Context) {
 	now := time.Now()
-	start := time.Date(now.Year(), now.Month(), now.Day(), 17, 45, 0, 0, now.Location())
-	end := time.Date(now.Year(), now.Month(), now.Day(), 21, 0, 0, 0, now.Location())
 
-	if now.Before(start) || now.After(end) {
-		utils.SendError(c, http.StatusForbidden, "Evening attendance is only available between 17:45 and 21:00", nil)
-		return
-	}
-
-	var req EveningAttendanceRequest
+	var req OnlineAttendanceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.SendError(c, http.StatusBadRequest, "Invalid request body", err)
 		return
@@ -190,13 +173,13 @@ func EveningAttendance(c *gin.Context) {
 		LinkVideo:       &req.LinkVideo,
 	}
 
-	res, err := services.EveningAttendance(asdosID, presensi, waktuMulai, waktuSelesai)
+	res, err := services.OnlineAttendance(asdosID, presensi, waktuMulai, waktuSelesai)
 	if err != nil {
-		utils.SendError(c, http.StatusInternalServerError, "Failed to submit evening attendance", err)
+		utils.SendError(c, http.StatusInternalServerError, "Failed to submit online attendance", err)
 		return
 	}
 
-	utils.SendSuccess(c, http.StatusCreated, "Evening attendance submitted successfully", mapToPresensiDTO(res))
+	utils.SendSuccess(c, http.StatusCreated, "Online attendance submitted successfully", mapToPresensiDTO(res))
 }
 
 func GetAllPresensi(c *gin.Context) {

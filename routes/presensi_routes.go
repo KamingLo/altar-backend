@@ -16,7 +16,7 @@ func PresensiRoutes(r *gin.RouterGroup) {
 			asdos.GET("/me", controllers.GetAllMyPresensi)
 			asdos.POST("/check-in", controllers.CheckIn)
 			asdos.POST("/check-out", controllers.CheckOut)
-			asdos.POST("/evening", controllers.EveningAttendance)
+			asdos.POST("/online", controllers.OnlineAttendance)
 		}
 
 		// Koordinator Routes
