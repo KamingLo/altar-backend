@@ -50,6 +50,7 @@ type PresensiResponseDTO struct {
 	DeskripsiMateri *string    `json:"deskripsi_materi,omitempty"`
 	TipeAbsensi     string     `json:"tipe_absensi"`
 	IsVerified      bool       `json:"is_verified"`
+	IsPaid          bool       `json:"is_paid"`
 	Menggantikan    bool       `json:"menggantikan"`
 	LinkVideo       *string    `json:"link_video,omitempty"`
 }
@@ -65,6 +66,7 @@ func mapToPresensiDTO(p models.Presensi) PresensiResponseDTO {
 		DeskripsiMateri: p.DeskripsiMateri,
 		TipeAbsensi:     string(p.TipeAbsensi),
 		IsVerified:      p.IsVerified,
+		IsPaid:          p.IsPaid,
 		Menggantikan:    p.Menggantikan,
 		LinkVideo:       p.LinkVideo,
 		NamaAsdos:       p.AsdosPelaksana.User.Username,
@@ -185,6 +187,8 @@ func OnlineAttendance(c *gin.Context) {
 func GetAllPresensi(c *gin.Context) {
 	verifiedStr := c.Query("is_verified")
 	tipe := c.Query("tipe_absensi")
+	idUser := c.Query("id_user")
+	idSemester := c.Query("id_semester")
 
 	var isVerified *bool
 	if verifiedStr != "" {
@@ -197,7 +201,17 @@ func GetAllPresensi(c *gin.Context) {
 		tipePtr = &tipe
 	}
 
-	res, err := services.GetAllPresensi(isVerified, tipePtr)
+	var idUserPtr *string
+	if idUser != "" {
+		idUserPtr = &idUser
+	}
+
+	var idSemesterPtr *string
+	if idSemester != "" {
+		idSemesterPtr = &idSemester
+	}
+
+	res, err := services.GetAllPresensi(isVerified, tipePtr, idUserPtr, idSemesterPtr)
 	if err != nil {
 		utils.SendError(c, http.StatusInternalServerError, "Failed to fetch attendance records", err)
 		return
@@ -249,5 +263,26 @@ func VerifyPresensi(c *gin.Context) {
 		msg = "Attendance record unverified/rejected"
 	}
 
+	utils.SendSuccess(c, http.StatusOK, msg, nil)
+}
+
+type UpdatePaymentRequest struct {
+	IDs    []string `json:"ids" binding:"required"`
+	IsPaid bool     `json:"is_paid"`
+}
+
+func UpdatePaymentStatus(c *gin.Context) {
+	var req UpdatePaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.SendError(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := services.UpdatePaymentStatus(req.IDs, req.IsPaid); err != nil {
+		utils.SendError(c, http.StatusInternalServerError, err.Error(), nil)
+		return
+	}
+
+	msg := "Payment status updated for selected records"
 	utils.SendSuccess(c, http.StatusOK, msg, nil)
 }
