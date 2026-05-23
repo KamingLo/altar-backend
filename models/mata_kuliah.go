@@ -14,6 +14,7 @@ type MataKuliah struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	NamaMK string `json:"nama_mk"`
+	KodeMK string `json:"kode_mk"`
 	SKS    int    `json:"sks"`
 }
 

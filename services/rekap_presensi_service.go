@@ -7,8 +7,9 @@ import (
 )
 
 type RekapPresensiResponse struct {
-	TotalHadir      int `json:"total_hadir"`
-	TotalTidakHadir int `json:"total_tidak_hadir"`
+	TotalHadir      int  `json:"total_hadir"`
+	TotalTidakHadir int  `json:"total_tidak_hadir"`
+	IsPaid          bool `json:"is_paid"`
 }
 
 type AsdosRekapResponse struct {
@@ -60,9 +61,21 @@ func GetRekapPresensi(asdosID string, startDate time.Time, endDate time.Time) (R
 
 	// Map untuk pengecekan kehadiran (IDSesi + Tanggal)
 	kehadiranMap := make(map[string]bool)
+	hasUnpaid := false
 	for _, p := range presensiList {
 		dateKey := p.TanggalMengajar.Format("2006-01-02")
 		kehadiranMap[p.IDSesi+"_"+dateKey] = true
+
+		if !p.IsPaid {
+			hasUnpaid = true
+		}
+	}
+
+	// Tentukan status IsPaid siklus
+	if rekap.TotalHadir > 0 && !hasUnpaid {
+		rekap.IsPaid = true
+	} else {
+		rekap.IsPaid = false
 	}
 
 	// 2. Kalkulasi TotalTidakHadir
