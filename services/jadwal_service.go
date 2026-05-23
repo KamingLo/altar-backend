@@ -612,11 +612,13 @@ func GetDailyAssistantSessions(dateStr string, assistantID string) ([]DailySessi
 	// 5. SUBSTITUTE SESSIONS: Fetch using optimized GORM JOINs
 	var substituteSessions []models.SubstituteSession
 	err = db.Preload("Session").
-		Preload("AsdosPengganti").Preload("AsdosPengganti.User").
-		Joins("JOIN jadwal_utamas ON jadwal_utamas.id = substitute_sessions.id_session").
+		Preload("Dosen").
+		Preload("Asdos1").Preload("Asdos1.User").
+		Preload("Asdos2").Preload("Asdos2.User").
+		Joins("JOIN jadwal_utamas ju ON ju.id = substitute_sessions.id_session").
 		Where("substitute_sessions.status = ? AND substitute_sessions.substitute_date = ?", models.StatusVerified, dateStr).
-		Where("(substitute_sessions.id_asdos_pengganti = ?) OR (substitute_sessions.id_asdos_pengganti IS NULL AND (jadwal_utamas.id_asdos1 = ? OR jadwal_utamas.id_asdos2 = ?))",
-			assistantID, assistantID, assistantID).
+		Where("(substitute_sessions.id_asdos1 = ? OR substitute_sessions.id_asdos2 = ?) OR ((substitute_sessions.id_dosen IS NULL AND substitute_sessions.id_asdos1 IS NULL AND substitute_sessions.id_asdos2 IS NULL) AND (ju.id_asdos1 = ? OR ju.id_asdos2 = ?))",
+			assistantID, assistantID, assistantID, assistantID).
 		Find(&substituteSessions).Error
 
 	if err != nil {
@@ -639,10 +641,8 @@ func GetDailyAssistantSessions(dateStr string, assistantID string) ([]DailySessi
 			continue
 		}
 
-		// Override Pengajar if there is a substitute assistant
-		if sub.AsdosPengganti != nil {
-			resp.Pengajar = sub.AsdosPengganti.User.Username
-		}
+		// Override Pengajar if there is a substitute formation
+		resp.Pengajar = FormatInstructor(sub.Session, sub)
 
 		// Override Waktu: "YYYY-MM-DD, HH:MM - HH:MM"
 		resp.Waktu = fmt.Sprintf("%s, %s - %s",
