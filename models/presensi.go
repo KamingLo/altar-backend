@@ -28,6 +28,7 @@ type Presensi struct {
 	TanggalMengajar  time.Time      `gorm:"type:date;not null" json:"tanggal_mengajar"`
 	DeskripsiMateri  *string        `gorm:"type:text;nullable" json:"deskripsi_materi"`
 	IsVerified       bool           `gorm:"default:false" json:"is_verified"`
+	IsPaid           bool           `gorm:"default:false" json:"is_paid"`
 	CreatedAt        time.Time      `json:"created_at"`
 	UpdatedAt        time.Time      `json:"updated_at"`
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`

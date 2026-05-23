@@ -32,7 +32,6 @@ func CheckIn(asdosID string, input models.Presensi) (models.Presensi, error) {
 	input.WaktuCheckIn = time.Now()
 	input.TanggalMengajar = time.Now()
 	input.TipeAbsensi = models.AbsensiQR
-	input.IsVerified = true // Auto verified if via QR
 
 	if err := config.DB.Create(&input).Error; err != nil {
 		return models.Presensi{}, err
@@ -117,7 +116,7 @@ func OnlineAttendance(asdosID string, input models.Presensi, startTime, endTime 
 	return input, nil
 }
 
-func GetAllPresensi(isVerified *bool, tipe *string) ([]models.Presensi, error) {
+func GetAllPresensi(isVerified *bool, tipe *string, idUser *string, idSemester *string) ([]models.Presensi, error) {
 	var presensi []models.Presensi
 	query := config.DB.
 		Preload("JadwalUtama.MataKuliah").
@@ -130,10 +129,20 @@ func GetAllPresensi(isVerified *bool, tipe *string) ([]models.Presensi, error) {
 		Preload("AsdosRekan.User")
 
 	if isVerified != nil {
-		query = query.Where("is_verified = ?", *isVerified)
+		query = query.Where("presensis.is_verified = ?", *isVerified)
 	}
 	if tipe != nil {
-		query = query.Where("tipe_absensi = ?", *tipe)
+		query = query.Where("presensis.tipe_absensi = ?", *tipe)
+	}
+
+	if idUser != nil {
+		query = query.Joins("JOIN asisten_dosens ON presensis.id_asdos_pelaksana = asisten_dosens.id").
+			Where("asisten_dosens.id = ?", *idUser)
+	}
+
+	if idSemester != nil {
+		query = query.Joins("JOIN jadwal_utamas ON presensis.id_sesi = jadwal_utamas.id").
+			Where("jadwal_utamas.id_semester = ?", *idSemester)
 	}
 
 	if err := query.Find(&presensi).Error; err != nil {
@@ -167,6 +176,17 @@ func VerifyPresensi(id string, verified bool) error {
 	}
 	if result.RowsAffected == 0 {
 		return errors.New("attendance record not found")
+	}
+	return nil
+}
+
+func UpdatePaymentStatus(ids []string, isPaid bool) error {
+	result := config.DB.Model(&models.Presensi{}).Where("id_presensi IN ?", ids).Update("is_paid", isPaid)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("no attendance records found to update")
 	}
 	return nil
 }

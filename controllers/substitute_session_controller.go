@@ -15,13 +15,15 @@ import (
 // ─────────────────────────────────────────────
 
 type CreateSubstituteSessionRequest struct {
-	IDSession           string  `json:"id_session"            binding:"required"`
-	IDRuangan           string  `json:"id_ruangan"            binding:"required"`
-	IDAsdosPengganti    *string `json:"id_asdos_pengganti"`   // optional — omit or null if no replacement teacher
-	SubstituteDate      string  `json:"substitute_date"       binding:"required"` // YYYY-MM-DD
-	OriginalDate        string  `json:"original_date"         binding:"required"` // YYYY-MM-DD
-	SlotOption          int     `json:"slot_option"           binding:"required,min=1,max=7"`
-	Reason              string  `json:"reason"                binding:"required"`
+	IDSession      string  `json:"id_session"            binding:"required"`
+	IDRuangan      string  `json:"id_ruangan"            binding:"required"`
+	IDDosen        *string `json:"id_dosen"`
+	IDAsdos1       *string `json:"id_asdos1"`
+	IDAsdos2       *string `json:"id_asdos2"`
+	SubstituteDate string  `json:"substitute_date"       binding:"required"` // YYYY-MM-DD
+	OriginalDate   string  `json:"original_date"         binding:"required"` // YYYY-MM-DD
+	SlotOption     int     `json:"slot_option"           binding:"required,min=1,max=7"`
+	Reason         string  `json:"reason"                binding:"required"`
 }
 
 // ─────────────────────────────────────────────
@@ -46,14 +48,17 @@ func CreateSubstituteSession(c *gin.Context) {
 		return
 	}
 
+	
 	input := &services.SubstituteSessionInput{
-		IDSession:           req.IDSession,
-		IDRuangan:           req.IDRuangan,
-		IDAsdosPengganti:    req.IDAsdosPengganti,
-		SubstituteDate:      req.SubstituteDate,
-		OriginalDate:        req.OriginalDate,
-		SlotOption:          req.SlotOption,
-		Reason:              req.Reason,
+		IDSession:      req.IDSession,
+		IDRuangan:      req.IDRuangan,
+		IDDosen:        req.IDDosen,
+		IDAsdos1:       req.IDAsdos1,
+		IDAsdos2:       req.IDAsdos2,
+		SubstituteDate: req.SubstituteDate,
+		OriginalDate:   req.OriginalDate,
+		SlotOption:     req.SlotOption,
+		Reason:         req.Reason,
 	}
 
 	resp, err := services.CreateSubstituteSession(input)
