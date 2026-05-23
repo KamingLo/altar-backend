@@ -14,9 +14,10 @@ func PresensiRoutes(r *gin.RouterGroup) {
 		asdos.Use(IsAsdosMiddleware())
 		{
 			asdos.GET("/me", controllers.GetAllMyPresensi)
+			asdos.GET("/rekap/me", controllers.GetRekapPresensiMe)
 			asdos.POST("/check-in", controllers.CheckIn)
 			asdos.POST("/check-out", controllers.CheckOut)
-			asdos.POST("/evening", controllers.EveningAttendance)
+			asdos.POST("/online", controllers.OnlineAttendance)
 		}
 
 		// Koordinator Routes
@@ -24,6 +25,7 @@ func PresensiRoutes(r *gin.RouterGroup) {
 		koor.Use(IsKoordinatorMiddleware())
 		{
 			koor.GET("/", controllers.GetAllPresensi)
+			koor.GET("/rekap", controllers.GetRekapPresensi)
 			koor.PATCH("/:id/verify", controllers.VerifyPresensi)
 		}
 	}

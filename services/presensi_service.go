@@ -90,7 +90,7 @@ func CheckOut(asdosID string, presensiID string, deskripsi string) (models.Prese
 	return presensi, nil
 }
 
-func EveningAttendance(asdosID string, input models.Presensi, startTime, endTime time.Time) (models.Presensi, error) {
+func OnlineAttendance(asdosID string, input models.Presensi, startTime, endTime time.Time) (models.Presensi, error) {
 	input.IDAsdosPelaksana = asdosID
 	input.WaktuCheckIn = startTime
 	input.WaktuCheckOut = &endTime
