@@ -14,7 +14,6 @@ func KoorRoutes(r *gin.RouterGroup) {
 		koor.GET("/", controllers.GetAllKoordinator)
 		koor.GET("/:id", controllers.GetKoordinatorByID)
 		koor.PATCH("/:id", controllers.UpdateKoordinator)
-		koor.DELETE("/:id", controllers.DeleteKoordinator)
 
 		// Kiosk Mode & QR
 		koor.POST("/kiosk/pin", controllers.SetKioskPIN)
