@@ -230,3 +230,33 @@ func GetMyScheduleTimeline(c *gin.Context) {
 		"items":       data,
 	})
 }
+
+// ─────────────────────────────────────────────
+// GET /substitute-sessions/me
+// Role: Asdos — list their own substitute session requests
+// ─────────────────────────────────────────────
+
+func GetMySubstituteSessions(c *gin.Context) {
+	asdosIDRaw, exists := c.Get("id_asisten")
+	if !exists || asdosIDRaw == nil {
+		utils.SendError(c, http.StatusUnauthorized, "Asdos identity not found in token", nil)
+		return
+	}
+
+	asdosID, ok := asdosIDRaw.(string)
+	if !ok || asdosID == "" {
+		utils.SendError(c, http.StatusUnauthorized, "Invalid asdos identity in token", nil)
+		return
+	}
+
+	data, err := services.GetMySubstituteSessions(asdosID)
+	if err != nil {
+		utils.SendError(c, http.StatusInternalServerError, "Failed to fetch personal substitute sessions", err)
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Personal substitute sessions fetched successfully", gin.H{
+		"items": data,
+		"total": len(data),
+	})
+}
