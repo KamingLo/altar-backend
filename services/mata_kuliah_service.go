@@ -8,6 +8,7 @@ import (
 type CourseSummary struct {
 	ID     string `json:"id"`
 	NamaMK string `json:"nama_mk"`
+	KodeMK string `json:"kode_mk"`
 	SKS    int    `json:"sks"`
 }
 

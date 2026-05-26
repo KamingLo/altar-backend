@@ -11,6 +11,7 @@ func SubstituteSessionRoutes(r *gin.RouterGroup) {
 	{
 		// Asdos: submit a new substitute session request
 		sub.POST("/", controllers.CreateSubstituteSession)
+		sub.GET("/me", IsAsdosMiddleware(), controllers.GetMySubstituteSessions)
 		sub.GET("/:id", controllers.GetSubstituteSessionByID)
 		sub.DELETE("/:id", controllers.DeleteSubstituteSession)
 

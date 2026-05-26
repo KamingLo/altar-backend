@@ -779,3 +779,28 @@ func GetTimelineJadwal(startDateStr, endDateStr, idSemester, asdosID string) ([]
 // Service: GetDailyAsdosSessions
 // Daily view for an Asdos for a specific date (combining regular & substitute).
 // ─────────────────────────────────────────────
+
+func GetMySubstituteSessions(asdosID string) ([]SubstituteSessionResponse, error) {
+	db := config.DB
+	var subs []models.SubstituteSession
+
+	query := db.Preload("Session").Preload("Session.Kelas").
+		Preload("Session.MataKuliah").
+		Preload("Ruangan").
+		Preload("Dosen").
+		Preload("Asdos1").Preload("Asdos1.User").
+		Preload("Asdos2").Preload("Asdos2.User").
+		Joins("JOIN jadwal_utamas ju ON ju.id = substitute_sessions.id_session").
+		Where("substitute_sessions.id_asdos1 = ? OR substitute_sessions.id_asdos2 = ? OR ju.id_asdos1 = ? OR ju.id_asdos2 = ?", asdosID, asdosID, asdosID, asdosID).
+		Order("substitute_sessions.created_at DESC")
+
+	if err := query.Find(&subs).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch personal substitute sessions: %w", err)
+	}
+
+	responses := make([]SubstituteSessionResponse, 0, len(subs))
+	for i := range subs {
+		responses = append(responses, buildSubstituteResponse(&subs[i]))
+	}
+	return responses, nil
+}

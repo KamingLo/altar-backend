@@ -12,6 +12,7 @@ import (
 
 type CourseRequest struct {
 	NamaMK string `json:"nama_mk" binding:"required"`
+	KodeMK string `json:"kode_mk" binding:"required"`
 	SKS    int    `json:"sks" binding:"required"`
 }
 
@@ -24,6 +25,7 @@ func CreateCourse(c *gin.Context) {
 
 	course := models.MataKuliah{
 		NamaMK: req.NamaMK,
+		KodeMK: req.KodeMK,
 		SKS:    req.SKS,
 	}
 
@@ -76,6 +78,7 @@ func UpdateCourse(c *gin.Context) {
 
 	updateData := map[string]interface{}{
 		"nama_mk": req.NamaMK,
+		"kode_mk": req.KodeMK,
 		"sks":     req.SKS,
 	}
 
