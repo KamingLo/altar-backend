@@ -116,7 +116,7 @@ func OnlineAttendance(asdosID string, input models.Presensi, startTime, endTime 
 	return input, nil
 }
 
-func GetAllPresensi(isVerified *bool, tipe *string, idUser *string, idSemester *string) ([]models.Presensi, error) {
+func GetAllPresensi(isVerified *bool, tipe *string, idUser *string, idSemester *string, isPaid *bool) ([]models.Presensi, error) {
 	var presensi []models.Presensi
 	query := config.DB.
 		Preload("JadwalUtama.MataKuliah").
@@ -133,6 +133,9 @@ func GetAllPresensi(isVerified *bool, tipe *string, idUser *string, idSemester *
 	}
 	if tipe != nil {
 		query = query.Where("presensis.tipe_absensi = ?", *tipe)
+	}
+	if isPaid != nil {
+		query = query.Where("presensis.is_paid = ?", *isPaid)
 	}
 
 	if idUser != nil {

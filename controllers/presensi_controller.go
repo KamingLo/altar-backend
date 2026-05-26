@@ -189,6 +189,7 @@ func GetAllPresensi(c *gin.Context) {
 	tipe := c.Query("tipe_absensi")
 	idUser := c.Query("id_user")
 	idSemester := c.Query("id_semester")
+	isPaidStr := c.Query("is_paid")
 
 	var isVerified *bool
 	if verifiedStr != "" {
@@ -211,7 +212,13 @@ func GetAllPresensi(c *gin.Context) {
 		idSemesterPtr = &idSemester
 	}
 
-	res, err := services.GetAllPresensi(isVerified, tipePtr, idUserPtr, idSemesterPtr)
+	var isPaidPtr *bool
+	if isPaidStr != "" {
+		p := isPaidStr == "true"
+		isPaidPtr = &p
+	}
+
+	res, err := services.GetAllPresensi(isVerified, tipePtr, idUserPtr, idSemesterPtr, isPaidPtr)
 	if err != nil {
 		utils.SendError(c, http.StatusInternalServerError, "Failed to fetch attendance records", err)
 		return
