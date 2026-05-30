@@ -7,6 +7,8 @@ import (
 	"errors"
 	"os"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func ValidateQRToken(tokenString string) (string, error) {
@@ -39,13 +41,18 @@ func CheckIn(asdosID string, input models.Presensi) (models.Presensi, error) {
 
 	// Reload with preloads
 	config.DB.
-		Preload("JadwalUtama.MataKuliah").
-		Preload("JadwalUtama.Kelas").
-		Preload("JadwalUtama.Ruangan").
-		Preload("SubstituteSession.Session.MataKuliah").
-		Preload("SubstituteSession.Session.Kelas").
-		Preload("SubstituteSession.Ruangan").
+		Preload("JadwalUtama", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("AsdosPelaksana", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosRekan.User").
 		First(&input, "id_presensi = ?", input.IDPresensi)
 
@@ -76,13 +83,18 @@ func CheckOut(asdosID string, presensiID string, deskripsi string) (models.Prese
 
 	// Reload with preloads
 	config.DB.
-		Preload("JadwalUtama.MataKuliah").
-		Preload("JadwalUtama.Kelas").
-		Preload("JadwalUtama.Ruangan").
-		Preload("SubstituteSession.Session.MataKuliah").
-		Preload("SubstituteSession.Session.Kelas").
-		Preload("SubstituteSession.Ruangan").
+		Preload("JadwalUtama", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("AsdosPelaksana", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosRekan.User").
 		First(&presensi, "id_presensi = ?", presensi.IDPresensi)
 
@@ -103,13 +115,18 @@ func OnlineAttendance(asdosID string, input models.Presensi, startTime, endTime 
 
 	// Reload with preloads
 	config.DB.
-		Preload("JadwalUtama.MataKuliah").
-		Preload("JadwalUtama.Kelas").
-		Preload("JadwalUtama.Ruangan").
-		Preload("SubstituteSession.Session.MataKuliah").
-		Preload("SubstituteSession.Session.Kelas").
-		Preload("SubstituteSession.Ruangan").
+		Preload("JadwalUtama", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("AsdosPelaksana", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosRekan.User").
 		First(&input, "id_presensi = ?", input.IDPresensi)
 
@@ -119,13 +136,18 @@ func OnlineAttendance(asdosID string, input models.Presensi, startTime, endTime 
 func GetAllPresensi(isVerified *bool, tipe *string, idUser *string, idSemester *string, isPaid *bool) ([]models.Presensi, error) {
 	var presensi []models.Presensi
 	query := config.DB.
-		Preload("JadwalUtama.MataKuliah").
-		Preload("JadwalUtama.Kelas").
-		Preload("JadwalUtama.Ruangan").
-		Preload("SubstituteSession.Session.MataKuliah").
-		Preload("SubstituteSession.Session.Kelas").
-		Preload("SubstituteSession.Ruangan").
+		Preload("JadwalUtama", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("AsdosPelaksana", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosRekan.User")
 
 	if isVerified != nil {
@@ -157,13 +179,18 @@ func GetAllPresensi(isVerified *bool, tipe *string, idUser *string, idSemester *
 func GetAllMyPresensi(asdosID string) ([]models.Presensi, error) {
 	var presensi []models.Presensi
 	err := config.DB.
-		Preload("JadwalUtama.MataKuliah").
-		Preload("JadwalUtama.Kelas").
-		Preload("JadwalUtama.Ruangan").
-		Preload("SubstituteSession.Session.MataKuliah").
-		Preload("SubstituteSession.Session.Kelas").
-		Preload("SubstituteSession.Ruangan").
+		Preload("JadwalUtama", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("JadwalUtama.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("SubstituteSession.Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("AsdosPelaksana", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosPelaksana.User").
+		Preload("AsdosRekan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("AsdosRekan.User").
 		Where("id_asdos_pelaksana = ? OR id_asdos_rekan = ?", asdosID, asdosID).
 		Order("waktu_check_in DESC").
