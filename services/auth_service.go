@@ -14,7 +14,7 @@ import (
 
 func CekAsdos(userID string) *string {
 	var asdos models.AsistenDosen
-	if err := config.DB.Where("user_id = ?", userID).First(&asdos).Error; err != nil {
+	if err := config.DB.Where("user_id = ? AND deactivated_at IS NULL", userID).First(&asdos).Error; err != nil {
 		return nil
 	}
 	return &asdos.ID
@@ -22,7 +22,7 @@ func CekAsdos(userID string) *string {
 
 func CekKoordinator(userID string) *string {
 	var koor models.Koordinator
-	if err := config.DB.Where("user_id = ?", userID).First(&koor).Error; err != nil {
+	if err := config.DB.Where("user_id = ? AND deactivated_at IS NULL", userID).First(&koor).Error; err != nil {
 		return nil
 	}
 	return &koor.ID

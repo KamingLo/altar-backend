@@ -6,6 +6,7 @@ import (
 	"altar/utils"
 	"errors"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -118,6 +119,17 @@ func CreateAsdos(userID, nim, phone string) error {
 	// Check if already an Asdos
 	var existingAsdos models.AsistenDosen
 	if err := tx.Where("user_id = ?", userID).First(&existingAsdos).Error; err == nil {
+		if existingAsdos.DeactivatedAt != nil {
+			// Reactivate and update details
+			existingAsdos.DeactivatedAt = nil
+			existingAsdos.NIM = nim
+			existingAsdos.PhoneNumber = phone
+			if err := tx.Save(&existingAsdos).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+			return tx.Commit().Error
+		}
 		tx.Rollback()
 		return errors.New("user is already registered as Asisten Dosen")
 	}
@@ -141,7 +153,7 @@ func GetAllAsdos(page int, search string) ([]AsdosSummary, error) {
 	query := config.DB.Model(&models.AsistenDosen{}).
 		Select("asisten_dosens.id, users.username, asisten_dosens.nim").
 		Joins("left join users on users.id = asisten_dosens.user_id").
-		Where("users.deleted_at IS NULL")
+		Where("users.deleted_at IS NULL AND asisten_dosens.deactivated_at IS NULL")
 
 	if search != "" {
 		query = query.Where("(users.username ILIKE ? OR asisten_dosens.nim LIKE ?)", "%"+search+"%", "%"+search+"%")
@@ -174,35 +186,25 @@ func UpdateAsdos(id string, nim, phone string) error {
 	return config.DB.Save(&asdos).Error
 }
 
-func DeleteAsdos(id string) error {
-	tx := config.DB.Begin()
-
+func DeactivateAsdos(id string) error {
 	var asdos models.AsistenDosen
-	if err := tx.Where("id = ?", id).First(&asdos).Error; err != nil {
-		tx.Rollback()
+	if err := config.DB.Where("id = ?", id).First(&asdos).Error; err != nil {
 		return errors.New("asisten dosen not found")
 	}
 
-	userID := asdos.UserID
+	now := time.Now()
+	asdos.DeactivatedAt = &now
 
-	if err := tx.Unscoped().Delete(&asdos).Error; err != nil {
-		tx.Rollback()
-		return err
+	return config.DB.Save(&asdos).Error
+}
+
+func ActivateAsdos(id string) error {
+	var asdos models.AsistenDosen
+	if err := config.DB.Where("id = ?", id).First(&asdos).Error; err != nil {
+		return errors.New("asisten dosen not found")
 	}
 
-	// Check if user has other roles
-	var otherKoor models.Koordinator
-	errKoor := tx.Where("user_id = ?", userID).First(&otherKoor).Error
-
-	// If no other roles, delete user
-	if errors.Is(errKoor, gorm.ErrRecordNotFound) {
-		if err := tx.Unscoped().Delete(&models.User{}, "id = ?", userID).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	return tx.Commit().Error
+	return config.DB.Model(&asdos).Update("deactivated_at", nil).Error
 }
 
 // --- Koordinator CRUD ---
@@ -223,6 +225,16 @@ func CreateKoordinator(userID, nip string) error {
 	// Check if already a Koordinator
 	var existingKoor models.Koordinator
 	if err := tx.Where("user_id = ?", userID).First(&existingKoor).Error; err == nil {
+		if existingKoor.DeactivatedAt != nil {
+			// Reactivate and update details
+			existingKoor.DeactivatedAt = nil
+			existingKoor.NIP = nip
+			if err := tx.Save(&existingKoor).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+			return tx.Commit().Error
+		}
 		tx.Rollback()
 		return errors.New("user is already registered as Koordinator")
 	}
@@ -245,7 +257,7 @@ func GetAllKoordinator(page int, search string) ([]KoorSummary, error) {
 	query := config.DB.Model(&models.Koordinator{}).
 		Select("koordinators.id, users.username, koordinators.nip").
 		Joins("left join users on users.id = koordinators.user_id").
-		Where("users.deleted_at IS NULL")
+		Where("users.deleted_at IS NULL AND koordinators.deactivated_at IS NULL")
 
 	if search != "" {
 		query = query.Where("(users.username ILIKE ? OR koordinators.NIP LIKE ?)", "%"+search+"%", "%"+search+"%")
@@ -277,33 +289,23 @@ func UpdateKoordinator(id string, nip string) error {
 	return config.DB.Save(&koor).Error
 }
 
-func DeleteKoordinator(id string) error {
-	tx := config.DB.Begin()
-
+func DeactivateKoordinator(id string) error {
 	var koor models.Koordinator
-	if err := tx.Where("id = ?", id).First(&koor).Error; err != nil {
-		tx.Rollback()
+	if err := config.DB.Where("id = ?", id).First(&koor).Error; err != nil {
 		return errors.New("koordinator not found")
 	}
 
-	userID := koor.UserID
+	now := time.Now()
+	koor.DeactivatedAt = &now
 
-	if err := tx.Unscoped().Delete(&koor).Error; err != nil {
-		tx.Rollback()
-		return err
+	return config.DB.Save(&koor).Error
+}
+
+func ActivateKoordinator(id string) error {
+	var koor models.Koordinator
+	if err := config.DB.Where("id = ?", id).First(&koor).Error; err != nil {
+		return errors.New("koordinator not found")
 	}
 
-	// Check if user has other roles
-	var otherAsdos models.AsistenDosen
-	errAsdos := tx.Where("user_id = ?", userID).First(&otherAsdos).Error
-
-	// If no other roles, delete user
-	if errors.Is(errAsdos, gorm.ErrRecordNotFound) {
-		if err := tx.Unscoped().Delete(&models.User{}, "id = ?", userID).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	return tx.Commit().Error
+	return config.DB.Model(&koor).Update("deactivated_at", nil).Error
 }

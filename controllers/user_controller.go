@@ -142,13 +142,22 @@ func UpdateAsdos(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Asisten Dosen updated successfully", nil)
 }
 
-func DeleteAsdos(c *gin.Context) {
+func DeactivateAsdos(c *gin.Context) {
 	id := c.Param("id")
-	if err := services.DeleteAsdos(id); err != nil {
+	if err := services.DeactivateAsdos(id); err != nil {
 		utils.SendError(c, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	utils.SendSuccess(c, http.StatusOK, "Asisten Dosen deleted successfully", nil)
+	utils.SendSuccess(c, http.StatusOK, "Asisten Dosen deactivated successfully", nil)
+}
+
+func ActivateAsdos(c *gin.Context) {
+	id := c.Param("id")
+	if err := services.ActivateAsdos(id); err != nil {
+		utils.SendError(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+	utils.SendSuccess(c, http.StatusOK, "Asisten Dosen activated successfully", nil)
 }
 
 // --- Koordinator Handlers ---
@@ -213,11 +222,20 @@ func UpdateKoordinator(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Koordinator updated successfully", nil)
 }
 
-func DeleteKoordinator(c *gin.Context) {
+func DeactivateKoordinator(c *gin.Context) {
 	id := c.Param("id")
-	if err := services.DeleteKoordinator(id); err != nil {
+	if err := services.DeactivateKoordinator(id); err != nil {
 		utils.SendError(c, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	utils.SendSuccess(c, http.StatusOK, "Koordinator deleted successfully", nil)
+	utils.SendSuccess(c, http.StatusOK, "Koordinator deactivated successfully", nil)
+}
+
+func ActivateKoordinator(c *gin.Context) {
+	id := c.Param("id")
+	if err := services.ActivateKoordinator(id); err != nil {
+		utils.SendError(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+	utils.SendSuccess(c, http.StatusOK, "Koordinator activated successfully", nil)
 }
