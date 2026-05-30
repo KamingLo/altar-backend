@@ -11,7 +11,7 @@ type Koordinator struct {
 	ID        string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	DeactivatedAt *time.Time     `gorm:"index" json:"deactivated_at,omitempty"`
 
 	UserID string `gorm:"type:varchar(36)" json:"user_id"`
 	NIP    string `gorm:"column:nip" json:"nip"`

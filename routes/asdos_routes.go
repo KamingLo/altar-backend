@@ -14,5 +14,7 @@ func AsdosRoutes(r *gin.RouterGroup) {
 		asdos.GET("/", controllers.GetAllAsdos)
 		asdos.GET("/:id", controllers.GetAsdosByID)
 		asdos.PATCH("/:id", controllers.UpdateAsdos)
+		asdos.PATCH("/:id/deactivate", controllers.DeactivateAsdos)
+		asdos.PATCH("/:id/activate", controllers.ActivateAsdos)
 	}
 }
