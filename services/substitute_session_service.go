@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // ─────────────────────────────────────────────
@@ -498,12 +500,15 @@ func CreateSubstituteSession(input *SubstituteSessionInput) (SubstituteSessionRe
 	}
 
 	// 10. Reload with full preloads for the response
-	if err := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").
-		Preload("Ruangan").
-		Preload("Dosen").
-		Preload("Asdos1").Preload("Asdos1.User").
-		Preload("Asdos2").Preload("Asdos2.User").
+	if err := db.Preload("Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1.User").
+		Preload("Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos2.User").
 		First(&sub, "id = ?", sub.ID).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("failed to reload substitute session: %w", err)
 	}
@@ -520,12 +525,15 @@ func GetAllSubstituteSessions(statusFilter string) ([]SubstituteSessionResponse,
 	db := config.DB
 	var subs []models.SubstituteSession
 
-	query := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").
-		Preload("Ruangan").
-		Preload("Dosen").
-		Preload("Asdos1").Preload("Asdos1.User").
-		Preload("Asdos2").Preload("Asdos2.User")
+	query := db.Preload("Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1.User").
+		Preload("Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos2.User")
 
 	if statusFilter != "" {
 		query = query.Where("status = ?", statusFilter)
@@ -550,12 +558,15 @@ func GetSubstituteSessionByID(id string) (SubstituteSessionResponse, error) {
 	db := config.DB
 	var sub models.SubstituteSession
 
-	if err := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").
-		Preload("Ruangan").
-		Preload("Dosen").
-		Preload("Asdos1").Preload("Asdos1.User").
-		Preload("Asdos2").Preload("Asdos2.User").
+	if err := db.Preload("Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1.User").
+		Preload("Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos2.User").
 		First(&sub, "id = ?", id).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("substitute session not found: %w", err)
 	}
@@ -625,12 +636,15 @@ func UpdateSubstituteStatus(id string, input *UpdateSubstituteStatusInput) (Subs
 	}
 
 	// 4. Reload data secara utuh beserta relasinya untuk response JSON
-	if err := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").
-		Preload("Ruangan").
-		Preload("Dosen").
-		Preload("Asdos1").Preload("Asdos1.User").
-		Preload("Asdos2").Preload("Asdos2.User").
+	if err := db.Preload("Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1.User").
+		Preload("Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos2.User").
 		First(&sub, "id = ?", id).Error; err != nil {
 		return SubstituteSessionResponse{}, fmt.Errorf("failed to reload substitute session after update: %w", err)
 	}
@@ -668,12 +682,14 @@ func GetTimelineJadwal(startDateStr, endDateStr, idSemester, asdosID string) ([]
 	//    Jika asdosID tidak kosong, filter id_asdos1 = asdosID OR id_asdos2 = asdosID.
 	var regularSessions []models.JadwalUtama
 	regularQuery := db.
-		Preload("Kelas").
-		Preload("MataKuliah").
-		Preload("Ruangan").
-		Preload("Dosen").
-		Preload("Asdos1").Preload("Asdos1.User").
-		Preload("Asdos2").Preload("Asdos2.User").
+		Preload("Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1.User").
+		Preload("Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos2.User").
 		Where("id_semester = ?", idSemester)
 	if asdosID != "" {
 		regularQuery = regularQuery.Where("id_asdos1 = ? OR id_asdos2 = ?", asdosID, asdosID)
@@ -686,16 +702,20 @@ func GetTimelineJadwal(startDateStr, endDateStr, idSemester, asdosID string) ([]
 	//    dan bersinggungan dengan range tanggal tersebut.
 	var substituteSessions []models.SubstituteSession
 	substituteQuery := db.
-		Preload("Session").
-		Preload("Session.Kelas").
-		Preload("Session.MataKuliah").
-		Preload("Session.Dosen").
-		Preload("Session.Asdos1").Preload("Session.Asdos1.User").
-		Preload("Session.Asdos2").Preload("Session.Asdos2.User").
-		Preload("Ruangan").
-		Preload("Dosen").
-		Preload("Asdos1").Preload("Asdos1.User").
-		Preload("Asdos2").Preload("Asdos2.User").
+		Preload("Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Asdos1.User").
+		Preload("Session.Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Asdos2.User").
+		Preload("Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1.User").
+		Preload("Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos2.User").
 		Where("status = ?", models.StatusVerified).
 		Where("substitute_date::date >= ? AND substitute_date::date <= ?",
 			startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
@@ -784,12 +804,15 @@ func GetMySubstituteSessions(asdosID string) ([]SubstituteSessionResponse, error
 	db := config.DB
 	var subs []models.SubstituteSession
 
-	query := db.Preload("Session").Preload("Session.Kelas").
-		Preload("Session.MataKuliah").
-		Preload("Ruangan").
-		Preload("Dosen").
-		Preload("Asdos1").Preload("Asdos1.User").
-		Preload("Asdos2").Preload("Asdos2.User").
+	query := db.Preload("Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.Kelas", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Session.MataKuliah", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Ruangan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1.User").
+		Preload("Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos2.User").
 		Joins("JOIN jadwal_utamas ju ON ju.id = substitute_sessions.id_session").
 		Where("substitute_sessions.id_asdos1 = ? OR substitute_sessions.id_asdos2 = ? OR ju.id_asdos1 = ? OR ju.id_asdos2 = ?", asdosID, asdosID, asdosID, asdosID).
 		Order("substitute_sessions.created_at DESC")

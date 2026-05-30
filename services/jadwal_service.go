@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // ─────────────────────────────────────────────
@@ -147,24 +149,24 @@ func loadSessionRelations(session *models.JadwalUtama) (SessionResponse, error) 
 	db := config.DB
 
 	var kelas models.Kelas
-	if err := db.First(&kelas, "id = ?", session.IDKelas).Error; err != nil {
+	if err := db.Unscoped().First(&kelas, "id = ?", session.IDKelas).Error; err != nil {
 		return SessionResponse{}, fmt.Errorf("class not found: %w", err)
 	}
 
 	var mk models.MataKuliah
-	if err := db.First(&mk, "id = ?", session.IDMk).Error; err != nil {
+	if err := db.Unscoped().First(&mk, "id = ?", session.IDMk).Error; err != nil {
 		return SessionResponse{}, fmt.Errorf("course not found: %w", err)
 	}
 
 	var ruangan models.Ruangan
-	if err := db.First(&ruangan, "id = ?", session.IDRuangan).Error; err != nil {
+	if err := db.Unscoped().First(&ruangan, "id = ?", session.IDRuangan).Error; err != nil {
 		return SessionResponse{}, fmt.Errorf("room not found: %w", err)
 	}
 
 	var dosen *models.Dosen
 	if session.IDDosen != nil {
 		d := &models.Dosen{}
-		if err := db.First(d, "id = ?", *session.IDDosen).Error; err != nil {
+		if err := db.Unscoped().First(d, "id = ?", *session.IDDosen).Error; err != nil {
 			return SessionResponse{}, fmt.Errorf("lecturer not found: %w", err)
 		}
 		dosen = d
@@ -173,7 +175,7 @@ func loadSessionRelations(session *models.JadwalUtama) (SessionResponse, error) 
 	var asdos1 *models.AsistenDosen
 	if session.IDAsdos1 != nil {
 		a := &models.AsistenDosen{}
-		if err := db.Preload("User").First(a, "id = ?", *session.IDAsdos1).Error; err != nil {
+		if err := db.Unscoped().Preload("User").First(a, "id = ?", *session.IDAsdos1).Error; err != nil {
 			return SessionResponse{}, fmt.Errorf("assistant lecturer 1 not found: %w", err)
 		}
 		asdos1 = a
@@ -182,7 +184,7 @@ func loadSessionRelations(session *models.JadwalUtama) (SessionResponse, error) 
 	var asdos2 *models.AsistenDosen
 	if session.IDAsdos2 != nil {
 		a := &models.AsistenDosen{}
-		if err := db.Preload("User").First(a, "id = ?", *session.IDAsdos2).Error; err != nil {
+		if err := db.Unscoped().Preload("User").First(a, "id = ?", *session.IDAsdos2).Error; err != nil {
 			return SessionResponse{}, fmt.Errorf("assistant lecturer 2 not found: %w", err)
 		}
 		asdos2 = a
@@ -611,10 +613,12 @@ func GetDailyAssistantSessions(dateStr string, assistantID string) ([]DailySessi
 
 	// 5. SUBSTITUTE SESSIONS: Fetch using optimized GORM JOINs
 	var substituteSessions []models.SubstituteSession
-	err = db.Preload("Session").
-		Preload("Dosen").
-		Preload("Asdos1").Preload("Asdos1.User").
-		Preload("Asdos2").Preload("Asdos2.User").
+	err = db.Preload("Session", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Dosen", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos1.User").
+		Preload("Asdos2", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Asdos2.User").
 		Joins("JOIN jadwal_utamas ju ON ju.id = substitute_sessions.id_session").
 		Where("substitute_sessions.status = ? AND substitute_sessions.substitute_date = ?", models.StatusVerified, dateStr).
 		Where("(substitute_sessions.id_asdos1 = ? OR substitute_sessions.id_asdos2 = ?) OR ((substitute_sessions.id_dosen IS NULL AND substitute_sessions.id_asdos1 IS NULL AND substitute_sessions.id_asdos2 IS NULL) AND (ju.id_asdos1 = ? OR ju.id_asdos2 = ?))",
