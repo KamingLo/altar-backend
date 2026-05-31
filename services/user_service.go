@@ -19,15 +19,17 @@ type UserSummary struct {
 }
 
 type AsdosSummary struct {
-	ID       string `json:"id_asdos" gorm:"column:id"`
-	Username string `json:"username" gorm:"column:username"`
-	NIM      string `json:"nim" gorm:"column:nim"`
+	ID             string `json:"id_asdos" gorm:"column:id"`
+	Username       string `json:"username" gorm:"column:username"`
+	NIM            string `json:"nim" gorm:"column:nim"`
+	Deactivated_At string `json:"deactivated_at" gorm:"column:deactivated_at"`
 }
 
 type KoorSummary struct {
-	ID       string `json:"id_koor" gorm:"column:id"`
-	Username string `json:"username" gorm:"column:username"`
-	NIP      string `json:"nip" gorm:"column:nip"`
+	ID             string `json:"id_koor" gorm:"column:id"`
+	Username       string `json:"username" gorm:"column:username"`
+	NIP            string `json:"nip" gorm:"column:nip"`
+	Deactivated_At string `json:"deactivated_at" gorm:"column:deactivated_at"`
 }
 
 // --- User CRUD ---
