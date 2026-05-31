@@ -151,9 +151,9 @@ func CreateAsdos(userID, nim, phone string) error {
 func GetAllAsdos(page int, search string) ([]AsdosSummary, error) {
 	var asdos []AsdosSummary
 	query := config.DB.Model(&models.AsistenDosen{}).
-		Select("asisten_dosens.id, users.username, asisten_dosens.nim").
+		Select("asisten_dosens.id, users.username, asisten_dosens.nim, asisten_dosens.deactivated_at").
 		Joins("left join users on users.id = asisten_dosens.user_id").
-		Where("users.deleted_at IS NULL AND asisten_dosens.deactivated_at IS NULL")
+		Where("users.deleted_at IS NULL")
 
 	if search != "" {
 		query = query.Where("(users.username ILIKE ? OR asisten_dosens.nim LIKE ?)", "%"+search+"%", "%"+search+"%")
@@ -255,9 +255,9 @@ func CreateKoordinator(userID, nip string) error {
 func GetAllKoordinator(page int, search string) ([]KoorSummary, error) {
 	var koor []KoorSummary
 	query := config.DB.Model(&models.Koordinator{}).
-		Select("koordinators.id, users.username, koordinators.nip").
+		Select("koordinators.id, users.username, koordinators.nip, koordinators.deactivated_at").
 		Joins("left join users on users.id = koordinators.user_id").
-		Where("users.deleted_at IS NULL AND koordinators.deactivated_at IS NULL")
+		Where("users.deleted_at IS NULL")
 
 	if search != "" {
 		query = query.Where("(users.username ILIKE ? OR koordinators.NIP LIKE ?)", "%"+search+"%", "%"+search+"%")
