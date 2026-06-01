@@ -82,6 +82,8 @@ type SessionResponse struct {
 	Ruangan    string `json:"ruangan"`  // Format: "Room Name (Floor X)"
 	Pengajar   string `json:"pengajar"` // Format: Lecturer name OR "Asdos1 & Asdos2" OR "Asdos1"
 	Waktu      string `json:"waktu"`    // Format: "Senin, 07:30 - 09:10"
+	IDAsdos1   *string `json:"id_asdos1,omitempty"`
+	IDAsdos2   *string `json:"id_asdos2,omitempty"`
 }
 
 // DailySessionResponse adalah gabungan antara response standar
@@ -137,6 +139,8 @@ func buildSessionResponse(
 		Ruangan:    roomStr,
 		Pengajar:   instructorStr,
 		Waktu:      scheduleStr,
+		IDAsdos1:   session.IDAsdos1,
+		IDAsdos2:   session.IDAsdos2,
 	}
 }
 
