@@ -1,14 +1,18 @@
 package routes
 
 import (
+	"os"
+
 	"github.com/gin-gonic/gin"
 )
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	// r.Use(CORSMiddleware())
-	// r.Use(RateLimitMiddleware())
+	if os.Getenv("GIN_MODE") == "release" {
+		r.Use(CORSMiddleware())
+		r.Use(RateLimitMiddleware())
+	}
 
 	// Public and self-managed Auth routes
 	AuthRoutes(r)
