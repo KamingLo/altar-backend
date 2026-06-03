@@ -1,14 +1,25 @@
 version: '3.8'
 
 services:
-  app:
+  api:
     build: .
     restart: always
-    container_name: altar-api-service
+    container_name: altar-api-prod
     ports:
-      - "8000:8000"
+      - "8000:8000" # Diakses publik/Nginx lewat port 8000
     env_file:
-      - .env
+      - .env.production
+    networks:
+      - altar-network
+
+  dev:
+    build: .
+    restart: always
+    container_name: altar-api-dev
+    ports:
+      - "8001:8000" # Di-map ke port 8001 di server Ubuntu Anda
+    env_file:
+      - .env.development
     networks:
       - altar-network
 
