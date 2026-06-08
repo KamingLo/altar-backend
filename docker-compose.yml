@@ -1,6 +1,3 @@
-fti@fti-server:~/altar-app/altar-backend$ cat docker-compose.yml
-version: '3.8'
-
 services:
   api:
     build: .
