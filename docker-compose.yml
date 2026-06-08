@@ -1,3 +1,4 @@
+fti@fti-server:~/altar-app/altar-backend$ cat docker-compose.yml
 version: '3.8'
 
 services:
@@ -11,7 +12,9 @@ services:
       - .env.production
     networks:
       - altar-network
-
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
   dev:
     build: .
     restart: always
@@ -22,7 +25,9 @@ services:
       - .env.development
     networks:
       - altar-network
-
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
 networks:
   altar-network:
     external: true
